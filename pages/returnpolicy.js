@@ -6,7 +6,7 @@ const RefundCancellationPolicy = () => {
       <div className="container mx-auto py-8 px-2 md:px-0 text-black">
         <h1 className="text-4xl font-bold mb-6">Refund and Cancellation Policy</h1>
         <h2 className="text-2xl font-semibold mb-4">Refund Policy</h2>
-        <p className="mb-4">At KashmirStag.com, our primary focus is customer satisfaction, which is why we strive to provide the best products and services. Please note that product images on our website are for representational purposes only and may vary slightly due to lighting conditions or other factors.</p>
+        <p className="mb-4">At KashmirStag.com, our primary focus is customer satisfaction, which is why we strive to provide the best products and services. Please note that product imgs on our website are for representational purposes only and may vary slightly due to lighting conditions or other factors.</p>
         <p className="mb-4">If you are unsatisfied with a product due to a major defect, we will review your case and provide a refund. The following conditions apply to our refund policy:</p>
         <ul className="list-disc ml-8 mb-4">
           <li>Items can only be returned within a 7-day window from the date of delivery.</li>

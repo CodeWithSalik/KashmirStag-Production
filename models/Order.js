@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 
 
 const OrderSchema = new mongoose.Schema({
-    userId: { type: String, required: true },
+    email: { type: String, required: true },
+    orderId: { type: String, required: true },
+    payInfo: { type: String, default: '' },
     products: [{
         productId: { type: String },
         quantity: { type: Number, default: 1 }
@@ -11,5 +13,7 @@ const OrderSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     status: { type: String, default: 'Pending'},
 }, { timestamps: true });
-mongoose.models = {}
-export default mongoose.model("Order", OrderSchema);
+// mongoose.models = {}
+// export default mongoose.model("Order", OrderSchema);
+
+export default mongoose.models.Order || mongoose.model("Order", OrderSchema);

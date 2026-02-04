@@ -2,6 +2,8 @@ import React from 'react'
 import Link from 'next/link'
 import Product from '@/models/Product'
 import mongoose from 'mongoose'
+import Image from 'next/image'
+
 
 const Shoes = ({ products }) => {
   return (
@@ -13,7 +15,7 @@ const Shoes = ({ products }) => {
             {Object.keys(products).map((item) => {
               return <Link passHref={true} key={products[item]._id} legacyBehavior href={`/product/${products[item].slug}`}>
                 <a className="lg:w-1/5 md:w-1/2 p-4 w-full block relative rounded overflow-hidden shadow-lg m-5">
-                  <img alt="ecommerce" className="m-auto  h-[30] md:h-[30] md:h-[36vh] block block" src={products[item].img} />
+                  <Image alt="ecommerce" className="m-auto  h-[30] md:h-[36vh] block" src={products[item].img} />
                   <div className="mt-4 text-center md:text-left">
                     <h3 className="text-gray-500 text-xs tracking-widest title-font mb-1">Shoes</h3>
                     <h2 className="text-gray-900 title-font text-lg font-medium">{products[item].title}</h2>

@@ -1,29 +1,34 @@
-import Product from "@/models/Product"
-import connectDb from "@/middleware/mongoose"
+import Product from "@/models/Product";
+import connectDb from "@/middleware/mongoose";
 
 const handler = async (req, res) => {
-    let products = await Product.find()
-    let tshirts = {}
-    for (let item of products){
-        if (item.title in tshirts){
-            if(!tshirts[item.title].color.includes(item.color) && item.availableQty > 0){
-                tshirts[item.title].color.push(item.color)
-            }
-            if(!tshirts[item.title].size.includes(item.size) && item.availableQty > 0){
-                tshirts[item.title].size.push(item.size)
-            }
+  try {
+    const products = await Product.find();
 
-        }
-        else{
-            tshirts[item.title] = JSON.parse(JSON.stringify(item))
-            if(item.availableQty > 0){
-                tshirts[item.title].color = [item.color]
-                tshirts[item.title].size = [item.size]
+    const tshirts = {};
+    products.forEach((item) => {
+      if (item.availableQty > 0) {
+        const { title, color, size } = item;
 
-            }
+        if (title in tshirts) {
+          tshirts[title].color.add(color);
+          tshirts[title].size.add(size);
+        } else {
+          tshirts[title] = { color: new Set([color]), size: new Set([size]) };
         }
-    }
-    res.status(200).json({ tshirts })
-}
+      }
+    });
+
+    // Convert Sets back to arrays
+    Object.keys(tshirts).forEach((title) => {
+      tshirts[title].color = Array.from(tshirts[title].color);
+      tshirts[title].size = Array.from(tshirts[title].size);
+    });
+
+    res.status(200).json({ tshirts });
+  } catch (error) {
+    res.status(500).json({ error: "An error occurred while fetching the products" });
+  }
+};
 
 export default connectDb(handler);

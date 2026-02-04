@@ -1,59 +1,59 @@
-import { useState } from 'react'
-import Footer from '@/component/Footer'
-import Navbar from '@/component/Navbar'
-import '@/styles/globals.css'
-import { useEffect } from 'react'
-import { useRouter } from 'next/router'
-import LoadingBar from 'react-top-loading-bar'
-
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Footer from '@/component/Footer';
+import Navbar from '@/component/Navbar';
+import LoadingBar from 'react-top-loading-bar';
+import { calculateSubTotal } from './cartUtils';
+import { CartContextProvider } from './CartContext';
 
 export default function App({ Component, pageProps }) {
-  const [progress, setProgress] = useState(0)
-  const [cart, setCart] = useState({})
-  const [subTotal, setSubTotal] = useState(0)
-  const [user, setUser] = useState({value: null})
-  const [key, setKey] = useState()
-  const router = useRouter()
-  
+  const [progress, setProgress] = useState(0);
+  const [cart, setCart] = useState({});
+  const [subTotal, setSubTotal] = useState(0);
+  const [user, setUser] = useState({ value: null });
+  const [key, setKey] = useState();
+  const router = useRouter();
+
   useEffect(() => {
-    router.events.on('routeChangeStart', ()=>{
-      setProgress(40)
-    })
-    router.events.on('routeChangeComplete', ()=>{
-      setProgress(100)
-    })
+    router.events.on('routeChangeStart', () => {
+      setProgress(40);
+    });
+    router.events.on('routeChangeComplete', () => {
+      setProgress(100);
+    });
+    const clearCart = () => {
+      setCart({});
+      localStorage.removeItem("cart");
+    };
+
     try {
-      const storedCart = localStorage.getItem("cart")
+      const storedCart = localStorage.getItem("cart");
       if (storedCart) {
-        setCart(JSON.parse(storedCart))
-        calculateSubTotal(JSON.parse(storedCart))
+        setCart(JSON.parse(storedCart));
+        const calculatedSubTotal = calculateSubTotal(JSON.parse(storedCart));
+        setSubTotal(calculatedSubTotal);
       }
+      
     } catch (error) {
-      console.error(error)
-      localStorage.removeItem("cart")
+      console.log(cart,"I am console form _app.js in useeffect")
+      console.error(error);
+      localStorage.removeItem("cart");
     }
-    const token = localStorage.getItem('token')
-    if(token){
-      setUser({value:token})
-      setKey(Math.random())
-    }
-  }, [router.query])
 
-  const logout = ()=>{
-    localStorage.removeItem("token")
-    setUser({value: null})
-    setKey(Math.random())
-    router.push('/')
-  }
-
-  const calculateSubTotal = (myCart) => {
-    let subt = 0
-    let keys = Object.keys(myCart)
-    for (let i = 0; i < keys.length; i++) {
-      subt += myCart[keys[i]].price * myCart[keys[i]].qty
+    const token = localStorage.getItem('token');
+    if (token) {
+      setUser({ value: token });
+      setKey(Math.random());
     }
-    setSubTotal(subt)
-  }
+  }, [router.query]);
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    setUser({ value: null });
+    setKey(Math.random());
+    router.push('/');
+  };
+
   const addToCart = (itemCode, qty, price, name, variant, size) => {
     let newCart = { ...cart };
     if (itemCode in newCart) {
@@ -64,13 +64,15 @@ export default function App({ Component, pageProps }) {
     setCart(newCart);
     saveCart(newCart);
   };
-  const buyNow = (itemCode, qty, price, name, variant, size)=>{
-    let newCart = {itemCode: { qty, price,name, variant, size }};
+
+  const buyNow = (itemCode, qty, price, name, variant, size) => {
+    let newCart = { ...cart };
+    newCart[itemCode] = { qty, price, name, variant, size };
     setCart(newCart);
-    saveCart(newCart)
-    router.push('/checkout')
-}
-  
+    saveCart(newCart);
+    router.push('/checkout');
+  };
+
   const removeFromCart = (itemCode, qty, price, name, variant, size) => {
     let newCart = { ...cart };
     if (itemCode in newCart) {
@@ -82,14 +84,16 @@ export default function App({ Component, pageProps }) {
     setCart(newCart);
     saveCart(newCart);
   };
+
   const saveCart = (myCart) => {
-    localStorage.setItem("cart", JSON.stringify(myCart))
-    calculateSubTotal(myCart)
-  }
+    localStorage.setItem("cart", JSON.stringify(myCart));
+    const calculatedSubTotal = calculateSubTotal(myCart);
+    setSubTotal(calculatedSubTotal);
+  };
 
   const clearCart = () => {
-    setCart({})
-    localStorage.removeItem("cart")
+    setCart({});
+    localStorage.removeItem("cart");
   }
 
   return (
@@ -99,9 +103,13 @@ export default function App({ Component, pageProps }) {
         progress={progress}
         onLoaderFinished={() => setProgress(0)}
       />
-      {key && <Navbar Logout={logout} user={user} key={key} cart={cart} addToCart={addToCart} removeFromCart={removeFromCart} clearCart={clearCart} subTotal={subTotal} />}
-      <Component buyNow={buyNow} cart={cart} addToCart={addToCart} removeFromCart={removeFromCart} clearCart={clearCart} subTotal={subTotal} {...pageProps} />
+      <Navbar Logout={logout} user={user} cart={cart} addToCart={addToCart} removeFromCart={removeFromCart} clearCart={clearCart} subTotal={subTotal} />
+      <CartContextProvider cart={cart} addToCart={addToCart} removeFromCart={removeFromCart}>
+
+      <Component calculateSubTotal={calculateSubTotal} buyNow={buyNow} cart={cart} addToCart={addToCart} removeFromCart={removeFromCart} clearCart={clearCart} subTotal={subTotal} {...pageProps} />
+      </CartContextProvider>
+
       <Footer />
     </>
-  )
+  );
 }
