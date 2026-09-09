@@ -26,12 +26,12 @@ export const phoneSchema = z.preprocess((val) => {
     digits = digits.slice(1);
   }
   return digits;
-}, z.string().regex(/^[6-9]\d{9}$/, 'Please provide a valid 10-digit Indian phone number'));
+}, z.string().regex(/^[6-9]\d{9}$/, 'Please provide a valid 10-digit Indian phone number')) as z.ZodType<string>;
 
 export const pincodeSchema = z.preprocess((val) => {
   if (typeof val !== 'string') return val;
   return val.replace(/\s+/g, '').trim();
-}, z.string().regex(/^\d{6}$/, 'Please provide a valid 6-digit PIN code'));
+}, z.string().regex(/^\d{6}$/, 'Please provide a valid 6-digit PIN code')) as z.ZodType<string>;
 
 export const priceSchema = z.number().int().min(0, 'Price cannot be negative');
 

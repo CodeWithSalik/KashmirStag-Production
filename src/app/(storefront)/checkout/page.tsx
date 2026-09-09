@@ -31,11 +31,60 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
 
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
+  const [isCustomAddress, setIsCustomAddress] = useState(false);
+
   useEffect(() => {
     if (user?.email && !email) {
       setEmail(user.email);
     }
   }, [user, email]);
+
+  useEffect(() => {
+    if (user) {
+      fetch('/api/addresses')
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            setSavedAddresses(json.data);
+            const defaultAddr = json.data.find((a: any) => a.isDefault) || json.data[0];
+            setSelectedAddressId(defaultAddr._id);
+            setAddress({
+              name: defaultAddr.name || '',
+              phone: defaultAddr.phone || '',
+              line1: defaultAddr.line1 || '',
+              line2: defaultAddr.line2 || '',
+              city: defaultAddr.city || '',
+              state: defaultAddr.state || '',
+              pincode: defaultAddr.pincode || '',
+              country: defaultAddr.country || 'IN',
+            });
+            setIsCustomAddress(false);
+          } else {
+            setIsCustomAddress(true);
+          }
+        })
+        .catch(() => setIsCustomAddress(true));
+    } else {
+      setIsCustomAddress(true);
+    }
+  }, [user]);
+
+  const handleSelectSavedAddress = (addr: any) => {
+    setSelectedAddressId(addr._id);
+    setIsCustomAddress(false);
+    setAddress({
+      name: addr.name || '',
+      phone: addr.phone || '',
+      line1: addr.line1 || '',
+      line2: addr.line2 || '',
+      city: addr.city || '',
+      state: addr.state || '',
+      pincode: addr.pincode || '',
+      country: addr.country || 'IN',
+    });
+  };
 
   useEffect(() => {
     if (couponCode) {
@@ -158,26 +207,97 @@ export default function CheckoutPage() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
-          <h2 className="text-xl font-semibold mb-4">Shipping Address</h2>
-          <div className="space-y-4">
-            {!user && (
-              <Input
-                type="email"
-                placeholder="Email Address (for order updates)"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Shipping Address</h2>
+            {savedAddresses.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomAddress(!isCustomAddress);
+                  if (isCustomAddress && savedAddresses.length > 0) {
+                    const defaultAddr = savedAddresses.find((a: any) => a.isDefault) || savedAddresses[0];
+                    handleSelectSavedAddress(defaultAddr);
+                  } else {
+                    setAddress({
+                      name: user?.name || '',
+                      phone: '',
+                      line1: '',
+                      line2: '',
+                      city: '',
+                      state: '',
+                      pincode: '',
+                      country: 'IN',
+                    });
+                  }
+                }}
+                className="text-xs text-brand-700 font-semibold hover:underline"
+              >
+                {isCustomAddress ? '← Use Saved Address' : '+ Add New Address'}
+              </button>
             )}
-            <Input placeholder="Full Name" value={address.name} onChange={(e) => setAddress({ ...address, name: e.target.value })} />
-            <Input placeholder="Phone Number" value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} />
-            <Input placeholder="Address Line 1" value={address.line1} onChange={(e) => setAddress({ ...address, line1: e.target.value })} />
-            <Input placeholder="Address Line 2 (Optional)" value={address.line2} onChange={(e) => setAddress({ ...address, line2: e.target.value })} />
-            <div className="grid grid-cols-2 gap-4">
-              <Input placeholder="City" value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} />
-              <Input placeholder="State" value={address.state} onChange={(e) => setAddress({ ...address, state: e.target.value })} />
-            </div>
-            <Input placeholder="Pincode" value={address.pincode} onChange={(e) => setAddress({ ...address, pincode: e.target.value })} />
           </div>
+
+          {savedAddresses.length > 0 && !isCustomAddress ? (
+            <div className="space-y-3 mb-6">
+              <p className="text-xs text-text-secondary mb-2">Select a delivery address:</p>
+              {savedAddresses.map((addr) => {
+                const isSelected = selectedAddressId === addr._id;
+                return (
+                  <div
+                    key={addr._id}
+                    onClick={() => handleSelectSavedAddress(addr)}
+                    className={`cursor-pointer border rounded-lg p-4 transition-all ${
+                      isSelected
+                        ? 'border-brand-600 bg-brand-50/20 shadow-sm'
+                        : 'border-border bg-white hover:border-text-muted'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-text">{addr.name}</span>
+                        {addr.isDefault && (
+                          <span className="bg-brand-100 text-brand-800 text-[10px] px-2 py-0.5 rounded-full font-medium">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="radio"
+                        checked={isSelected}
+                        onChange={() => handleSelectSavedAddress(addr)}
+                        className="text-brand-600 focus:ring-brand-500 cursor-pointer"
+                      />
+                    </div>
+                    <div className="text-xs text-text-secondary space-y-0.5 mt-1">
+                      <p>{addr.line1} {addr.line2 ? `, ${addr.line2}` : ''}</p>
+                      <p>{addr.city}, {addr.state} - {addr.pincode}</p>
+                      <p className="text-text font-medium mt-1">Phone: {addr.phone}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {!user && (
+                <Input
+                  type="email"
+                  placeholder="Email Address (for order updates)"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              )}
+              <Input placeholder="Full Name" value={address.name} onChange={(e) => setAddress({ ...address, name: e.target.value })} />
+              <Input placeholder="Phone Number" value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} />
+              <Input placeholder="Address Line 1" value={address.line1} onChange={(e) => setAddress({ ...address, line1: e.target.value })} />
+              <Input placeholder="Address Line 2 (Optional)" value={address.line2} onChange={(e) => setAddress({ ...address, line2: e.target.value })} />
+              <div className="grid grid-cols-2 gap-4">
+                <Input placeholder="City" value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} />
+                <Input placeholder="State" value={address.state} onChange={(e) => setAddress({ ...address, state: e.target.value })} />
+              </div>
+              <Input placeholder="Pincode" value={address.pincode} onChange={(e) => setAddress({ ...address, pincode: e.target.value })} />
+            </div>
+          )}
         </div>
 
         <div className="bg-gray-50 p-6 rounded-lg border">
