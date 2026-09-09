@@ -53,7 +53,7 @@ export default function ReturnsPage() {
             </li>
           </ol>
           <p className="mt-4">
-            If you checked out as a guest, please email us at <strong>support@kashmirstag.com</strong> with your order number and request.
+            If you checked out as a guest, please email us at <strong>pirzadasalik116@gmail.com</strong> with your order number and request.
           </p>
         </section>
 

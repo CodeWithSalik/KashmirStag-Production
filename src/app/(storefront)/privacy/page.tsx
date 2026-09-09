@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
             Under certain circumstances, you have rights under data protection laws in relation to your personal data, including the right to request access, correction, erasure, restriction, transfer, to object to processing, to portability of data and (where the lawful ground of processing is consent) to withdraw consent.
           </p>
           <p className="mt-4">
-            If you wish to exercise any of the rights set out above, please contact us at support@kashmirstag.com.
+            If you wish to exercise any of the rights set out above, please contact us at pirzadasalik116@gmail.com.
           </p>
         </section>
       </div>

@@ -45,3 +45,21 @@ export const footerLinks = {
     { label: 'Terms & Conditions', href: '/terms' },
   ],
 };
+
+export const developerConfig = {
+  name: 'Salik Pirzada',
+  brand: 'CodeWithSalik',
+  github: 'https://github.com/CodeWithSalik',
+  instagram: 'https://www.instagram.com/codewithsalik/',
+};
+
+export const socialLinks = [
+  {
+    name: 'GitHub',
+    href: 'https://github.com/CodeWithSalik',
+  },
+  {
+    name: 'Instagram',
+    href: 'https://www.instagram.com/codewithsalik/',
+  },
+];

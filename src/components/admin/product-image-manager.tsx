@@ -171,7 +171,7 @@ export function ProductImageManager({ images, onChange, disabled = false }: Prod
       {showUrlInput && (
         <div className="flex gap-2 p-3 bg-surface-secondary border border-border rounded-lg">
           <Input
-            placeholder="https://example.com/image.jpg"
+            placeholder="https://images.unsplash.com/photo-..."
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             disabled={disabled}

@@ -31,8 +31,8 @@ export default function ContactPage() {
                 <div>
                   <h4 className="font-semibold text-text mb-1">Email Us</h4>
                   <p className="text-text-secondary text-sm mb-2">Our team usually responds within 24 hours.</p>
-                  <a href="mailto:support@kashmirstag.com" className="text-brand-600 hover:text-brand-700 font-medium">
-                    support@kashmirstag.com
+                  <a href="mailto:pirzadasalik116@gmail.com" className="text-brand-600 hover:text-brand-700 font-medium">
+                    pirzadasalik116@gmail.com
                   </a>
                 </div>
               </div>

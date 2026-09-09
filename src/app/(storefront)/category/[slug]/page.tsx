@@ -7,6 +7,8 @@ import Product from '@/models/Product';
 import Category from '@/models/Category';
 import { ProductCardType } from "@/components/product/product-card";
 
+import { generateCategorySeo } from "@/config/seo";
+
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -14,11 +16,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   await connectDB();
   const category = await Category.findOne({ slug }).lean() as any;
   if (!category) return { title: "Category Not Found | KashmirStag" };
-  return { 
-    title: `${category.name} | KashmirStag`, 
-    description: category.description || `Shop ${category.name} at KashmirStag.` 
-  };
+  return generateCategorySeo({
+    name: category.name,
+    description: category.description,
+    slug: category.slug,
+  });
 }
+
 
 export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

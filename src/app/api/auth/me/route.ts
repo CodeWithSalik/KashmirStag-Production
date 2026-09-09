@@ -7,13 +7,18 @@ import { getProfile, updateProfile, checkAndPromoteAdmin } from '@/services/auth
 
 export async function GET(request: Request) {
   try {
-    await connectDB();
     const authUser = getAuthUser(request);
     if (!authUser) {
-      throw new UnauthorizedError('Not authenticated');
+      return successResponse({ user: null });
     }
 
+    await connectDB();
     const user = await getProfile(authUser.sub);
+    if (!user) {
+      const response = successResponse({ user: null });
+      clearAuthCookie(response);
+      return response;
+    }
     
     // Auto-promote admin if matching env emails (and not already admin)
     if (user.role !== 'admin') {

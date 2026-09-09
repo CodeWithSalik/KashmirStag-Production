@@ -69,10 +69,12 @@ export interface IOrder extends Document {
     refundId?: string;
     refundAmount?: number;
   };
+  notificationsSent?: string[];
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
 
 const addressSchema = new Schema(
   {
@@ -143,8 +145,10 @@ const orderSchema = new Schema<IOrder>(
       refundId: { type: String },
       refundAmount: { type: Number },
     },
+    notificationsSent: { type: [String], default: [] },
     notes: { type: String },
   },
+
   { timestamps: true }
 );
 

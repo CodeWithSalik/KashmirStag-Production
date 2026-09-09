@@ -46,6 +46,7 @@ export default async function ShopPage({
 
   const [productsDocs, totalDocs, categoriesDocs] = (await Promise.all([
     Product.find(query)
+      .select('title slug images basePrice compareAtPrice avgRating reviewCount categoryId')
       .sort(sortObj)
       .skip((page - 1) * limit)
       .limit(limit)

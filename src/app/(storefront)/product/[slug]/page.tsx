@@ -12,6 +12,8 @@ import { Price } from "@/components/ui/price";
 import { StarRating } from "@/components/ui/star-rating";
 import { AddToCartButton } from "./add-to-cart-button";
 
+import { generateProductSeo } from "@/config/seo";
+
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -19,11 +21,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   await connectDB();
   const product = await Product.findOne({ slug }).lean() as any;
   if (!product) return { title: "Product Not Found | KashmirStag" };
-  return { 
-    title: `${product.title} | KashmirStag`, 
-    description: product.description || `Buy ${product.title} at KashmirStag.` 
-  };
+  return generateProductSeo({
+    name: product.title,
+    description: product.description,
+    images: product.images,
+    slug: product.slug,
+  });
 }
+
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -71,8 +76,40 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   }
   breadcrumbItems.push({ label: product.title, href: `/product/${product.slug}` });
 
+  const productJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.title,
+    description: product.description,
+    image: product.images && product.images.length > 0 ? product.images : undefined,
+    brand: {
+      '@type': 'Brand',
+      name: 'KashmirStag',
+    },
+    offers: {
+      '@type': 'Offer',
+      price: (product.basePrice / 100).toFixed(2),
+      priceCurrency: 'INR',
+      availability: variants.some((v: any) => (v.availableQty || 0) > 0)
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+      url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://kashmirstag.com'}/product/${product.slug}`,
+    },
+    ...(product.reviewCount > 0 && {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: product.avgRating,
+        reviewCount: product.reviewCount,
+      },
+    }),
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
       <Breadcrumb items={breadcrumbItems} className="mb-6" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">

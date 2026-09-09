@@ -19,7 +19,7 @@ export default function AdminSettingsPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Contact Email</label>
-            <Input defaultValue="support@kashmirstag.com" />
+            <Input defaultValue="pirzadasalik116@gmail.com" />
           </div>
           <Button>Save Changes</Button>
         </div>

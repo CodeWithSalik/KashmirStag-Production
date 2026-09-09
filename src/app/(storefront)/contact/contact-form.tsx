@@ -3,35 +3,101 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/providers/toast-provider';
 
 export function ContactForm() {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: '',
+  });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldErrors({});
+
+    const trimmedName = formData.name.trim();
+    const trimmedEmail = formData.email.trim();
+    const trimmedSubject = formData.subject.trim();
+    const trimmedMessage = formData.message.trim();
+
+    const clientErrors: Record<string, string> = {};
+    if (trimmedName.length < 2) {
+      clientErrors.name = 'Name must be at least 2 characters';
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      clientErrors.email = 'Please provide a valid email address';
+    }
+    if (trimmedSubject.length < 2) {
+      clientErrors.subject = 'Subject must be at least 2 characters';
+    }
+    if (trimmedMessage.length < 5) {
+      clientErrors.message = 'Message must be at least 5 characters';
+    }
+
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      const firstError = Object.values(clientErrors)[0];
+      toast(firstError, 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      const form = e.target as HTMLFormElement;
-      const formData = new FormData(form);
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.get('name'),
-          email: formData.get('email'),
-          subject: formData.get('subject'),
-          message: formData.get('message'),
+          name: trimmedName,
+          email: trimmedEmail,
+          subject: trimmedSubject,
+          message: trimmedMessage,
         }),
       });
 
       const data = await res.json();
+
       if (!res.ok) {
-        throw new Error(data.error?.message || 'Failed to send message');
+        if (Array.isArray(data.errors)) {
+          const backendFieldErrors: Record<string, string> = {};
+          data.errors.forEach((err: any) => {
+            const fieldName = err.path?.[0];
+            if (fieldName && typeof err.message === 'string') {
+              backendFieldErrors[fieldName] = err.message;
+            }
+          });
+          setFieldErrors(backendFieldErrors);
+          const firstMsg = data.errors[0]?.message;
+          throw new Error(firstMsg || data.error || 'Failed to send message');
+        }
+
+        const errorMsg =
+          typeof data.error === 'string'
+            ? data.error
+            : data.error?.message || 'Failed to send message';
+        throw new Error(errorMsg);
       }
 
       toast('Your message has been sent successfully. We will get back to you soon!', 'success');
-      form.reset();
+      setFormData({ name: '', email: '', subject: '', message: '' });
+      setFieldErrors({});
     } catch (err: any) {
       toast(err.message || 'Something went wrong. Please try again.', 'error');
     } finally {
@@ -47,38 +113,47 @@ export function ContactForm() {
         <Input 
           label="Your Name" 
           name="name" 
+          value={formData.name}
+          onChange={handleChange}
+          error={fieldErrors.name}
           required 
-          placeholder="John Doe" 
+          minLength={2}
+          placeholder="Your Full Name" 
         />
         <Input 
           label="Email Address" 
           name="email" 
           type="email" 
+          value={formData.email}
+          onChange={handleChange}
+          error={fieldErrors.email}
           required 
-          placeholder="john@example.com" 
+          placeholder="yourname@gmail.com" 
         />
       </div>
       
       <Input 
         label="Subject" 
         name="subject" 
+        value={formData.subject}
+        onChange={handleChange}
+        error={fieldErrors.subject}
         required 
+        minLength={2}
         placeholder="How can we help you?" 
       />
       
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="message" className="text-sm font-medium text-text">
-          Message <span className="text-error">*</span>
-        </label>
-        <textarea
-          id="message"
-          name="message"
-          required
-          rows={5}
-          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm placeholder:text-text-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 transition-colors"
-          placeholder="Please describe your inquiry in detail..."
-        />
-      </div>
+      <Textarea
+        label="Message"
+        name="message"
+        value={formData.message}
+        onChange={handleChange}
+        error={fieldErrors.message}
+        required
+        minLength={5}
+        rows={5}
+        placeholder="Please describe your inquiry in detail (at least 5 characters)..."
+      />
       
       <Button type="submit" size="lg" isLoading={isSubmitting} className="w-full sm:w-auto self-start mt-2">
         Send Message

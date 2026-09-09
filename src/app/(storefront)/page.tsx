@@ -1,39 +1,65 @@
+import { Metadata } from 'next';
 import Link from 'next/link';
 import { connectDB } from '@/lib/db';
 import Category from '@/models/Category';
 import Product from '@/models/Product';
 import { ProductCard, ProductCardType } from '@/components/product/product-card';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
+
+export const metadata: Metadata = {
+  title: 'KashmirStag — Authentic Artisanal Fashion & Heritage Craft from Kashmir',
+  description: 'Discover genuine Kashmiri Pashmina shawls, artisanal apparel, handcrafted footwear, and lifestyle essentials. Hand-spun craftsmanship delivered worldwide.',
+  alternates: {
+    canonical: '/',
+  },
+};
 
 export default async function HomePage() {
   await connectDB();
 
-  // Fetch active categories
+  // Fetch active categories with lean projection
   const categoriesDocs = await Category.find({ isActive: { $ne: false } })
+    .select('name slug description image sortOrder')
     .sort({ sortOrder: 1 })
     .lean();
 
-  // Attach product counts
-  const categories = await Promise.all(
-    categoriesDocs.map(async (cat: any) => {
-      const count = await Product.countDocuments({
-        $or: [{ categoryId: cat._id }, { category: cat._id }],
+  // Aggregate product counts across active categories in a single query (eliminates N+1)
+  const categoryIds = categoriesDocs.map((c: any) => c._id);
+  const countAggregations = await Product.aggregate([
+    {
+      $match: {
         status: 'active',
-      });
-      return {
-        id: cat._id.toString(),
-        name: cat.name,
-        slug: cat.slug,
-        description: cat.description || '',
-        image: cat.image || '',
-        productCount: count,
-      };
-    })
+        $or: [
+          { categoryId: { $in: categoryIds } },
+          { category: { $in: categoryIds } },
+        ],
+      },
+    },
+    {
+      $group: {
+        _id: { $ifNull: ['$categoryId', '$category'] },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const countMap = new Map<string, number>(
+    countAggregations.map((item: any) => [item._id?.toString(), item.count])
   );
 
-  // Fetch featured products
+  const categories = categoriesDocs.map((cat: any) => ({
+    id: cat._id.toString(),
+    name: cat.name,
+    slug: cat.slug,
+    description: cat.description || '',
+    image: cat.image || '',
+    productCount: countMap.get(cat._id.toString()) || 0,
+  }));
+
+  // Fetch featured products with lean projections
   const productsDocs = await Product.find({ status: 'active', isVisible: true })
+    .select('title slug images basePrice compareAtPrice avgRating reviewCount categoryId')
     .sort({ totalSold: -1, createdAt: -1 })
     .limit(4)
     .populate('categoryId', 'name')
@@ -72,7 +98,7 @@ export default async function HomePage() {
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 href="/shop"
-                className="inline-flex items-center rounded-md bg-brand-600 px-8 py-3.5 text-sm font-semibold text-white transition-all shadow-md hover:bg-brand-700 hover:shadow-lg"
+                className="inline-flex items-center rounded-md bg-brand-700 px-8 py-3.5 text-sm font-semibold text-white transition-all shadow-md hover:bg-brand-800 hover:shadow-lg"
               >
                 Shop Collection &rarr;
               </Link>
@@ -88,7 +114,8 @@ export default async function HomePage() {
       </section>
 
       {/* Value Props */}
-      <section className="border-b border-border bg-surface-secondary py-10">
+      <section className="border-b border-border bg-surface-secondary py-10" aria-label="Store Benefits">
+        <h2 className="sr-only">Why Choose KashmirStag</h2>
         <div className="container-page">
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             {[
@@ -195,7 +222,7 @@ export default async function HomePage() {
       <section className="py-16 md:py-20">
         <div className="container-page">
           <div className="max-w-3xl mx-auto text-center">
-            <span className="text-xs font-semibold uppercase tracking-widest text-brand-600">
+            <span className="text-xs font-semibold uppercase tracking-widest text-brand-700">
               The KashmirStag Philosophy
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold text-text mt-3">

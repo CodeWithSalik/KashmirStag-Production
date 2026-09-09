@@ -1,10 +1,18 @@
 import Order from '@/models/Order';
 import Payment from '@/models/Payment';
+import Notification from '@/models/Notification';
 import { inventoryService } from './inventory.service';
-import { sendOrderConfirmation } from '@/lib/email';
+import {
+  sendOrderConfirmation,
+  sendOrderStatusUpdate,
+  sendShippingNotification,
+  sendDeliveryNotification,
+  sendCancellationNotification,
+} from '@/lib/email';
 import { AppError, NotFoundError } from '@/lib/errors';
 
 import mongoose from 'mongoose';
+
 
 export async function getOrderById(orderId: string, userId?: string) {
   const isObjectId = mongoose.Types.ObjectId.isValid(orderId) && /^[0-9a-fA-F]{24}$/.test(orderId);
@@ -52,6 +60,56 @@ export const ORDER_STATE_TRANSITIONS: Record<string, string[]> = {
   returned: []
 };
 
+/**
+ * Atomically marks an event as notified on the Order and dispatches the email.
+ * Prevents race conditions and duplicate emails between webhooks and client redirects.
+ */
+async function recordAndSendOrderNotification(order: any, eventType: string, sendFn: () => Promise<any>) {
+  try {
+    const updated = await Order.findOneAndUpdate(
+      { orderId: order.orderId, notificationsSent: { $ne: eventType } },
+      { $addToSet: { notificationsSent: eventType } },
+      { new: true }
+    );
+
+    if (!updated) {
+      console.log(`[Order:Notification] Bypassing duplicate email for ${order.orderId}:${eventType}`);
+      return;
+    }
+
+    // Trigger email non-blocking / isolated
+    sendFn().catch((err) => {
+      console.error(`[Order:Notification] Failed to send email for ${order.orderId}:${eventType}:`, err?.message || err);
+    });
+
+    // Record in Notification audit collection
+    try {
+      await Notification.create({
+        userId: updated.userId || undefined,
+        recipientEmail: updated.email,
+        type: `ORDER_${eventType.toUpperCase()}`,
+        title: `Order #${order.orderId} ${eventType}`,
+        message: `Transactional email for ${eventType} dispatched to ${updated.email}`,
+        data: { orderId: order.orderId, eventType, total: updated.pricing?.total },
+        channel: 'email',
+        idempotencyKey: `${order.orderId}:${eventType}`,
+        sentAt: new Date(),
+      });
+    } catch {
+      // ignore duplicate log error
+    }
+  } catch (err: any) {
+    console.error(`[Order:Notification] Error recording notification for ${order.orderId}:${eventType}:`, err?.message || err);
+  }
+}
+
+function toObjectId(id?: string): mongoose.Types.ObjectId | undefined {
+  if (id && mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return undefined;
+}
+
 export async function updateOrderStatus(orderId: string, newStatus: any, actorId?: string, comment?: string) {
   const isObjectId = mongoose.Types.ObjectId.isValid(orderId) && /^[0-9a-fA-F]{24}$/.test(orderId);
   const order = await Order.findOne({
@@ -71,8 +129,29 @@ export async function updateOrderStatus(orderId: string, newStatus: any, actorId
   }
 
   order.status = newStatus;
-  order.timeline.push({ status: newStatus, comment, actorId: actorId ? (actorId as any) : undefined, createdAt: new Date() });
+  order.timeline.push({ status: newStatus, comment, actorId: toObjectId(actorId), createdAt: new Date() });
   await order.save();
+
+
+  // Transactional Email Triggers
+  if (newStatus === 'processing') {
+    await recordAndSendOrderNotification(order, 'processing', () =>
+      sendOrderStatusUpdate(order.email, order, 'processing', comment)
+    );
+  } else if (newStatus === 'shipped') {
+    await recordAndSendOrderNotification(order, 'shipped', () =>
+      sendShippingNotification(order.email, order, {
+        carrier: order.fulfillment?.carrier,
+        trackingNumber: order.fulfillment?.trackingNumber,
+        trackingUrl: order.fulfillment?.trackingUrl,
+      })
+    );
+  } else if (newStatus === 'delivered') {
+    await recordAndSendOrderNotification(order, 'delivered', () =>
+      sendDeliveryNotification(order.email, order)
+    );
+  }
+
   return order;
 }
 
@@ -84,9 +163,15 @@ export async function addTrackingInfo(orderId: string, carrier: string, tracking
   if (!order) throw new NotFoundError('Order');
 
   order.fulfillment = { carrier, trackingNumber, trackingUrl, shippedAt: new Date() };
-  order.timeline.push({ status: 'shipped', comment: 'Tracking info added', actorId: actorId as any, createdAt: new Date() });
+  order.timeline.push({ status: 'shipped', comment: 'Tracking info added', actorId: toObjectId(actorId), createdAt: new Date() });
   order.status = 'shipped';
+
   await order.save();
+
+  await recordAndSendOrderNotification(order, 'shipped', () =>
+    sendShippingNotification(order.email, order, { carrier, trackingNumber, trackingUrl })
+  );
+
   return order;
 }
 
@@ -125,8 +210,14 @@ export async function cancelOrder(orderId: string, reason: string, actorId?: str
 
   order.status = 'cancelled';
   order.cancellation = { reason, requestedAt: new Date() };
-  order.timeline.push({ status: 'cancelled', comment: reason, actorId: actorId as any, createdAt: new Date() });
+  order.timeline.push({ status: 'cancelled', comment: reason, actorId: toObjectId(actorId), createdAt: new Date() });
   await order.save();
+
+
+  await recordAndSendOrderNotification(order, 'cancelled', () =>
+    sendCancellationNotification(order.email, order, reason, order.cancellation?.refundAmount)
+  );
+
   return order;
 }
 
@@ -158,9 +249,20 @@ export async function confirmPayment(gatewayOrderId: string, paymentId: string) 
     const itemsToCommit = order.items.map(item => ({ variantId: item.variantId.toString(), quantity: item.quantity }));
     await inventoryService.commitReservation(itemsToCommit, order.orderId);
 
-    await sendOrderConfirmation(order.email, { orderId: order.orderId, items: order.items, total: order.pricing.total }).catch(console.error);
+    // Atomically dispatch order confirmation email
+    await recordAndSendOrderNotification(order, 'confirmed', () =>
+      sendOrderConfirmation(order.email, {
+        orderId: order.orderId,
+        items: order.items,
+        pricing: order.pricing,
+        total: order.pricing?.total,
+        shippingAddress: order.shippingAddress,
+        createdAt: order.createdAt,
+      })
+    );
   }
 }
+
 
 export async function cleanupExpiredReservations(expiryMinutes = 30) {
   const cutoff = new Date(Date.now() - expiryMinutes * 60 * 1000);

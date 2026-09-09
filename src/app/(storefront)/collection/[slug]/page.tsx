@@ -7,18 +7,36 @@ import Product from '@/models/Product';
 import Collection from '@/models/Collection';
 import { ProductCardType } from "@/components/product/product-card";
 
+import { APP_NAME, APP_URL } from "@/config/constants";
+
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   await connectDB();
   const collection = await Collection.findOne({ slug }).lean() as any;
-  if (!collection) return { title: "Collection Not Found | KashmirStag" };
+  if (!collection) return { title: `Collection Not Found | ${APP_NAME}` };
+  const desc = collection.description || `Browse the ${collection.name} collection at ${APP_NAME}.`;
   return { 
-    title: `${collection.name} | KashmirStag`, 
-    description: collection.description || `Browse the ${collection.name} collection at KashmirStag.` 
+    title: `${collection.name} | ${APP_NAME}`, 
+    description: desc,
+    alternates: {
+      canonical: `${APP_URL}/collection/${collection.slug}`,
+    },
+    openGraph: {
+      type: 'website',
+      title: `${collection.name} | ${APP_NAME}`,
+      description: desc,
+      url: `${APP_URL}/collection/${collection.slug}`,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${collection.name} | ${APP_NAME}`,
+      description: desc,
+    },
   };
 }
+
 
 export default async function CollectionPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

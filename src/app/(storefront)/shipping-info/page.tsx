@@ -78,7 +78,7 @@ export default function ShippingInfoPage() {
         <section className="mt-8">
           <h2 className="text-2xl font-bold text-text mb-4">Damaged Items During Transit</h2>
           <p>
-            If you receive a package that appears damaged or tampered with, please do not accept the delivery. If you have already accepted it, please take photos of the damaged package and items, and contact us immediately at support@kashmirstag.com with your order number.
+            If you receive a package that appears damaged or tampered with, please do not accept the delivery. If you have already accepted it, please take photos of the damaged package and items, and contact us immediately at pirzadasalik116@gmail.com with your order number.
           </p>
         </section>
       </div>
