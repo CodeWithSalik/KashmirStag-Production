@@ -67,20 +67,41 @@ export default function CheckoutPage() {
     setError('');
     
     try {
+      const cleanedPhone = address.phone.replace(/\D/g, '').replace(/^(?:91|0)/, '');
+      const cleanedPincode = address.pincode.replace(/\s+/g, '');
+
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          shippingAddress: address,
-          couponCode,
-          email: user?.email || email,
+          shippingAddress: {
+            ...address,
+            name: address.name.trim(),
+            phone: cleanedPhone || address.phone.trim(),
+            line1: address.line1.trim(),
+            line2: address.line2?.trim() || undefined,
+            city: address.city.trim(),
+            state: address.state.trim(),
+            pincode: cleanedPincode || address.pincode.trim(),
+          },
+          couponCode: couponCode || undefined,
+          email: (user?.email || email || '').trim() || undefined,
         }),
       });
       const data = await res.json();
       
-      if (!res.ok) throw new Error(data.error || 'Checkout failed');
+      if (!res.ok) {
+        const errorMsg = data.errors && data.errors.length > 0
+          ? data.errors.map((e: any) => e.message || `${e.path?.join('.')}: ${e.message}`).join(', ')
+          : (data.error || 'Checkout failed');
+        throw new Error(errorMsg);
+      }
 
       const { orderId, razorpayOrderId, amount, currency, keyId } = data.data;
+
+      if (typeof window !== 'undefined' && !(window as any).Razorpay) {
+        throw new Error('Payment gateway failed to initialize. Please ensure ad-blockers are disabled and try again.');
+      }
 
       const options = {
         key: keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -112,14 +133,14 @@ export default function CheckoutPage() {
         prefill: {
           name: address.name,
           email: user?.email || email || '',
-          contact: address.phone,
+          contact: cleanedPhone || address.phone,
         },
         theme: { color: '#000000' },
       };
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
-        setError(response.error.description);
+        setError(response.error?.description || 'Payment was declined or cancelled');
       });
       rzp.open();
 

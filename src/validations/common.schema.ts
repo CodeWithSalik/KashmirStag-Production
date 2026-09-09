@@ -16,9 +16,22 @@ export const searchSchema = z.object({
   query: z.string().min(1).max(200),
 });
 
-export const phoneSchema = z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian phone number');
+export const phoneSchema = z.preprocess((val) => {
+  if (typeof val !== 'string') return val;
+  let digits = val.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  return digits;
+}, z.string().regex(/^[6-9]\d{9}$/, 'Please provide a valid 10-digit Indian phone number'));
 
-export const pincodeSchema = z.string().regex(/^\d{6}$/, 'Invalid pincode');
+export const pincodeSchema = z.preprocess((val) => {
+  if (typeof val !== 'string') return val;
+  return val.replace(/\s+/g, '').trim();
+}, z.string().regex(/^\d{6}$/, 'Please provide a valid 6-digit PIN code'));
 
 export const priceSchema = z.number().int().min(0, 'Price cannot be negative');
 

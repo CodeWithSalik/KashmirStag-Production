@@ -3,21 +3,27 @@ import { phoneSchema, pincodeSchema } from './common.schema';
 import { ORDER_STATUSES } from '@/config/constants';
 
 export const addressSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().trim().min(1, 'Full name is required'),
   phone: phoneSchema,
-  line1: z.string().min(1),
-  line2: z.string().optional(),
-  city: z.string().min(1),
-  state: z.string().min(1),
+  line1: z.string().trim().min(1, 'Street address is required'),
+  line2: z.preprocess((val) => (val === null || val === '' ? undefined : typeof val === 'string' ? val.trim() : val), z.string().optional()),
+  city: z.string().trim().min(1, 'City is required'),
+  state: z.string().trim().min(1, 'State is required'),
   pincode: pincodeSchema,
-  country: z.string().default('IN'),
+  country: z.string().trim().default('IN'),
 });
 
 export const checkoutSchema = z.object({
-  email: z.string().email().optional(),
+  email: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() !== '' ? val.trim().toLowerCase() : undefined),
+    z.string().email('Please provide a valid email address').optional()
+  ) as z.ZodType<string | undefined>,
   shippingAddress: addressSchema,
-  billingAddress: addressSchema.optional(),
-  couponCode: z.string().max(50).toUpperCase().optional(),
+  billingAddress: z.preprocess((val) => (val === null ? undefined : val), addressSchema.optional()) as z.ZodType<AddressSchema | undefined>,
+  couponCode: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() !== '' ? val.trim().toUpperCase() : undefined),
+    z.string().max(50).optional()
+  ) as z.ZodType<string | undefined>,
 });
 
 export const updateOrderStatusSchema = z.object({
