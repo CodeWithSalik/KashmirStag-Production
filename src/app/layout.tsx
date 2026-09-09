@@ -6,6 +6,8 @@ import { CartProvider } from '@/providers/cart-provider';
 import { ToastProvider } from '@/providers/toast-provider';
 import { APP_NAME, APP_DESCRIPTION } from '@/config/constants';
 import { developerConfig } from '@/config/navigation';
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const inter = Inter({
   subsets: ['latin'],
@@ -100,6 +102,8 @@ export default function RootLayout({
             </ToastProvider>
           </CartProvider>
         </AuthProvider>
+         <SpeedInsights />
+          <Analytics />
       </body>
     </html>
   );
