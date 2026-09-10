@@ -7,7 +7,20 @@ import slugify from 'slugify';
 export const collectionService = {
   getCollections: async (includeInactive = false) => {
     const query = includeInactive ? {} : { isActive: true };
-    return await Collection.find(query).sort({ createdAt: -1 }).lean();
+    const collections = await Collection.find(query).sort({ createdAt: -1 }).lean();
+    const colIds = collections.map((c) => c._id);
+    const Product = (await import('@/models/Product')).default;
+    const counts = await Product.aggregate([
+      { $match: { collectionIds: { $in: colIds }, status: { $ne: 'deleted' } } },
+      { $unwind: '$collectionIds' },
+      { $match: { collectionIds: { $in: colIds } } },
+      { $group: { _id: '$collectionIds', count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map((c: any) => [c._id.toString(), c.count]));
+    return collections.map((c: any) => ({
+      ...c,
+      productCount: countMap.get(c._id.toString()) || 0,
+    }));
   },
   getCollectionBySlug: async (slug: string) => {
     return await Collection.findOne({ slug }).lean();
@@ -71,5 +84,16 @@ export const collectionService = {
 
     await auditService.log(actorId, 'ARCHIVE_COLLECTION', 'Collection', id, { name: col.name });
     return { action: 'archived', message: `Collection "${col.name}" archived/deactivated successfully.` };
+  },
+  restoreCollection: async (id: string, actorId: any) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) throw new BadRequestError('Invalid collection ID');
+    const col = await Collection.findById(id);
+    if (!col) throw new NotFoundError('Collection', id);
+
+    col.isActive = true;
+    await col.save();
+
+    await auditService.log(actorId, 'RESTORE_COLLECTION', 'Collection', id, { name: col.name });
+    return { action: 'restored', message: `Collection "${col.name}" restored/activated successfully.` };
   },
 };

@@ -59,10 +59,10 @@ const moderateSchema = z.object({
 export async function PUT(request: NextRequest) {
   try {
     await connectDB();
-    requireAdmin(request);
+    const admin = requireAdmin(request);
 
     const { reviewId, status } = await parseBody(request, moderateSchema);
-    const updated = await ReviewService.moderateReview(reviewId, status);
+    const updated = await ReviewService.moderateReview(reviewId, status, admin.sub);
 
     return successResponse(updated, `Review ${status} successfully`);
   } catch (error) {

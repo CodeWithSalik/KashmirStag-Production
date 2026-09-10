@@ -12,9 +12,24 @@ export const productService = {
     const { page = 1, limit = 20, search, category, collection, tags, minPrice, maxPrice, sortBy, sortOrder = 'desc', status, inStock } = params;
     const query: any = {};
     if (status) query.status = status;
-    if (search) query.$text = { $search: search };
-    if (category) query.categoryId = category;
-    if (collection) query.collectionIds = collection;
+    if (category) {
+      if (mongoose.Types.ObjectId.isValid(category)) {
+        query.categoryId = category;
+      } else {
+        const Category = (await import('@/models/Category')).default;
+        const catDoc = await Category.findOne({ slug: category }).lean();
+        query.categoryId = catDoc ? catDoc._id : new mongoose.Types.ObjectId();
+      }
+    }
+    if (collection) {
+      if (mongoose.Types.ObjectId.isValid(collection)) {
+        query.collectionIds = collection;
+      } else {
+        const Collection = (await import('@/models/Collection')).default;
+        const colDoc = await Collection.findOne({ slug: collection }).lean();
+        query.collectionIds = colDoc ? colDoc._id : new mongoose.Types.ObjectId();
+      }
+    }
     if (tags && (Array.isArray(tags) ? tags.length > 0 : Boolean(tags))) {
       query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
     }
@@ -22,6 +37,17 @@ export const productService = {
       query.basePrice = {};
       if (minPrice) query.basePrice.$gte = Number(minPrice);
       if (maxPrice) query.basePrice.$lte = Number(maxPrice);
+    }
+
+    if (search) {
+      const matchingVariants = await ProductVariant.find({ sku: { $regex: search, $options: 'i' } }, 'productId').lean();
+      const prodIdsFromSku = matchingVariants.map((v) => v.productId);
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { slug: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } },
+        { _id: { $in: prodIdsFromSku } },
+      ];
     }
     
     let sortQuery: any = { createdAt: -1 };
@@ -34,12 +60,15 @@ export const productService = {
       .skip(skip)
       .limit(limit)
       .populate('categoryId', 'name')
+      .populate('collectionIds', 'name title slug')
       .lean();
 
     const total = await Product.countDocuments(query);
     
     const formattedProducts = await Promise.all(products.map(async (p: any) => {
       const variants = await ProductVariant.find({ productId: p._id }).lean();
+      const totalStock = variants.reduce((sum, v) => sum + (v.availableQty || 0), 0);
+      const totalReserved = variants.reduce((sum, v) => sum + (v.reservedQty || 0), 0);
       return {
         id: p._id,
         title: p.title,
@@ -50,11 +79,58 @@ export const productService = {
         avgRating: p.avgRating,
         reviewCount: p.reviewCount,
         categoryName: p.categoryId?.name || '',
+        categoryId: p.categoryId?._id || p.categoryId,
+        collections: Array.isArray(p.collectionIds) ? p.collectionIds.map((col: any) => ({
+          id: col._id,
+          title: col.name || col.title,
+          slug: col.slug
+        })) : [],
         status: p.status,
+        totalSold: p.totalSold ?? 0,
+        totalStock,
+        totalReserved,
+        variantCount: variants.length,
       };
     }));
 
     return { products: formattedProducts, total, page, totalPages: Math.ceil(total / limit) };
+  },
+  ensureDefaultVariant: async (productId: string | mongoose.Types.ObjectId, initialStock = 10) => {
+    const existing = await ProductVariant.find({ productId }).lean();
+    if (existing.length > 0) return existing;
+
+    const product = await Product.findById(productId);
+    if (!product) return [];
+
+    const generatedSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const cleanSlugPart = (product.slug || 'PROD').substring(0, 8).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const variantSku = `KS-${cleanSlugPart}-${generatedSuffix}`;
+
+    const newVariant = await ProductVariant.create({
+      productId: product._id,
+      sku: variantSku,
+      price: product.basePrice,
+      compareAtPrice: product.compareAtPrice,
+      costPrice: product.costPrice,
+      availableQty: initialStock,
+      reservedQty: 0,
+      lowStockThreshold: 5,
+      image: product.images?.[0] || undefined,
+      isActive: true,
+    });
+
+    if (initialStock > 0) {
+      const InventoryTransaction = (await import('@/models/InventoryTransaction')).default;
+      await InventoryTransaction.create({
+        variantId: newVariant._id,
+        productId: product._id,
+        type: 'RESTOCK',
+        quantity: initialStock,
+        note: 'Default variant auto-provisioned',
+      });
+    }
+
+    return [newVariant.toObject() as any];
   },
   getProductBySlug: async (slug: string) => {
     const product = await Product.findOne({ slug })
@@ -62,7 +138,10 @@ export const productService = {
       .populate('collectionIds', 'name')
       .lean();
     if (!product) return null;
-    const variants = await ProductVariant.find({ productId: product._id }).lean();
+    let variants: any[] = await ProductVariant.find({ productId: product._id }).lean();
+    if (variants.length === 0 && product.status === 'active') {
+      variants = await productService.ensureDefaultVariant(product._id);
+    }
     return { ...product, id: product._id, variants };
   },
   getProductById: async (id: string) => {
@@ -71,20 +150,92 @@ export const productService = {
       .populate('collectionIds', 'name')
       .lean();
     if (!product) return null;
-    const variants = await ProductVariant.find({ productId: product._id }).lean();
+    let variants: any[] = await ProductVariant.find({ productId: product._id }).lean();
+    if (variants.length === 0 && product.status === 'active') {
+      variants = await productService.ensureDefaultVariant(product._id);
+    }
     return { ...product, id: product._id, variants };
   },
   createProduct: async (data: any, actorId: any) => {
     if (!data.slug && data.title) {
       data.slug = slugify(data.title, { lower: true, strict: true });
     }
-    const product = await Product.create(data);
+
+    // Extract variant fields before creating Product
+    const {
+      sku: customSku,
+      initialStock,
+      stock,
+      lowStockThreshold: customThreshold,
+      size,
+      color,
+      ...productFields
+    } = data;
+
+    const product = await Product.create(productFields);
+
+    // Provision initial variant so product is in stock and visible in Inventory
+    const generatedSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const cleanSlugPart = (product.slug || 'PROD').substring(0, 8).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const variantSku = customSku?.trim() || `KS-${cleanSlugPart}-${generatedSuffix}`;
+    const qty = typeof initialStock === 'number' ? initialStock : (typeof stock === 'number' ? stock : 10);
+    const threshold = typeof customThreshold === 'number' ? customThreshold : 5;
+
+    const defaultVariant = await ProductVariant.create({
+      productId: product._id,
+      sku: variantSku,
+      price: product.basePrice,
+      compareAtPrice: product.compareAtPrice,
+      costPrice: product.costPrice,
+      size: size?.trim() || undefined,
+      color: color?.trim() || undefined,
+      availableQty: qty,
+      reservedQty: 0,
+      lowStockThreshold: threshold,
+      image: product.images?.[0] || undefined,
+      isActive: true,
+    });
+
+    if (qty > 0) {
+      const InventoryTransaction = (await import('@/models/InventoryTransaction')).default;
+      await InventoryTransaction.create({
+        variantId: defaultVariant._id,
+        productId: product._id,
+        type: 'RESTOCK',
+        quantity: qty,
+        actorId,
+        note: 'Initial stock quantity set upon product creation',
+      });
+    }
+
     await auditService.log(actorId, 'CREATE_PRODUCT', 'Product', product._id, data);
     return product;
   },
   updateProduct: async (id: string, data: any, actorId: any) => {
-    const product = await Product.findByIdAndUpdate(id, data, { new: true }).lean();
-    if (product) await auditService.log(actorId, 'UPDATE_PRODUCT', 'Product', id, data);
+    const {
+      sku,
+      initialStock,
+      stock,
+      lowStockThreshold,
+      size,
+      color,
+      ...productFields
+    } = data;
+
+    const product = await Product.findByIdAndUpdate(id, productFields, { new: true }).lean();
+    if (product) {
+      // If stock adjustment passed
+      const qty = typeof initialStock === 'number' ? initialStock : (typeof stock === 'number' ? stock : undefined);
+      if (qty !== undefined) {
+        const variant = await ProductVariant.findOne({ productId: id, isActive: true });
+        if (variant) {
+          variant.availableQty = qty;
+          if (sku) variant.sku = sku;
+          await variant.save();
+        }
+      }
+      await auditService.log(actorId, 'UPDATE_PRODUCT', 'Product', id, data);
+    }
     return product;
   },
   archiveProduct: async (id: string, actorId: any) => {

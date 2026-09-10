@@ -5,7 +5,7 @@ import { DataTable } from '@/components/admin/data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AdminCouponsPage() {
@@ -88,6 +88,34 @@ export default function AdminCouponsPage() {
     }
   };
 
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    try {
+      const nextActive = currentStatus !== 'active';
+      const res = await fetch(`/api/admin/coupons/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: nextActive }),
+      });
+      if (!res.ok) throw new Error('Failed to update coupon status');
+      toast({ title: 'Success', description: `Coupon ${nextActive ? 'activated' : 'deactivated'}` });
+      fetchCoupons();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteCoupon = async (id: string, code: string) => {
+    if (!confirm(`Are you sure you want to delete coupon ${code}?`)) return;
+    try {
+      const res = await fetch(`/api/admin/coupons/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete coupon');
+      toast({ title: 'Success', description: `Coupon ${code} deleted` });
+      fetchCoupons();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
   const columns = [
     { key: 'code', label: 'Code' },
     { key: 'type', label: 'Type' },
@@ -103,6 +131,30 @@ export default function AdminCouponsPage() {
       label: 'Status',
       render: (row: any) => (
         <Badge variant={row.status === 'active' ? 'success' : 'default'}>{row.status}</Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (row: any) => (
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={row.status === 'active' ? 'outline' : 'primary'}
+            onClick={() => handleToggleStatus(row.id, row.status)}
+            className="text-xs h-7 px-2"
+          >
+            {row.status === 'active' ? 'Deactivate' : 'Activate'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleDeleteCoupon(row.id, row.code)}
+            className="text-xs h-7 px-2 text-error hover:bg-error/10 hover:border-error"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       ),
     },
   ];

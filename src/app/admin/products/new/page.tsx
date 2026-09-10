@@ -25,6 +25,11 @@ const formSchema = z.object({
   tags: z.string().optional(),
   status: z.enum(['draft', 'active', 'archived'] as const),
   weight: z.coerce.number().min(0).optional(),
+  initialStock: z.coerce.number().int().min(0, 'Stock cannot be negative'),
+  sku: z.string().optional(),
+  size: z.string().optional(),
+  color: z.string().optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -33,6 +38,8 @@ export default function NewProductPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [categories, setCategories] = useState<any[]>([]);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
@@ -42,23 +49,32 @@ export default function NewProductPage() {
       status: 'active',
       basePrice: 0,
       description: '',
+      initialStock: 10,
+      lowStockThreshold: 5,
     }
   });
 
-  // Fetch live categories from MongoDB
+  // Fetch live categories and collections from MongoDB
   useEffect(() => {
-    async function loadCategories() {
+    async function loadCatalogMeta() {
       try {
-        const res = await fetch('/api/admin/categories');
-        if (res.ok) {
-          const json = await res.json();
+        const [catRes, colRes] = await Promise.all([
+          fetch('/api/admin/categories'),
+          fetch('/api/admin/collections'),
+        ]);
+        if (catRes.ok) {
+          const json = await catRes.json();
           setCategories(json.data || []);
         }
+        if (colRes.ok) {
+          const json = await colRes.json();
+          setCollections(json.data || []);
+        }
       } catch (err) {
-        console.error('Failed to load categories', err);
+        console.error('Failed to load catalog metadata', err);
       }
     }
-    loadCategories();
+    loadCatalogMeta();
   }, []);
 
   const titleVal = watch('title');
@@ -82,6 +98,11 @@ export default function NewProductPage() {
         status: data.status,
         weight: data.weight || undefined,
         images,
+        initialStock: data.initialStock,
+        sku: data.sku || undefined,
+        size: data.size || undefined,
+        color: data.color || undefined,
+        lowStockThreshold: data.lowStockThreshold,
       };
 
       if (data.categoryId && data.categoryId !== 'none') {
@@ -90,6 +111,10 @@ export default function NewProductPage() {
 
       if (data.tags) {
         payload.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+      }
+
+      if (selectedCollections.length > 0) {
+        payload.collectionIds = selectedCollections;
       }
 
       const res = await fetch('/api/admin/products', {
@@ -202,6 +227,60 @@ export default function NewProductPage() {
           </div>
         </Card>
 
+        {/* Inventory & Initial Stock */}
+        <Card className="p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-text">Inventory & Initial Stock</h3>
+            <p className="text-xs text-text-secondary mt-0.5">
+              Set starting inventory quantity so this product is immediately available for purchase.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-text">Initial Stock Quantity *</label>
+              <Input
+                type="number"
+                min={0}
+                {...register('initialStock')}
+                placeholder="e.g. 10"
+              />
+              {errors.initialStock && <p className="text-red-500 text-xs mt-1">{errors.initialStock.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-text">SKU (Stock Keeping Unit)</label>
+              <Input
+                {...register('sku')}
+                placeholder="Auto-generated if empty (e.g. KS-SHAWL-01)"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-text">Low Stock Alert Threshold</label>
+              <Input
+                type="number"
+                min={0}
+                {...register('lowStockThreshold')}
+                placeholder="5"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-text">Size / Dimensions (Optional)</label>
+              <Input
+                {...register('size')}
+                placeholder="e.g. One Size, 100x200 cm, Free Size"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-text">Color / Shade (Optional)</label>
+              <Input
+                {...register('color')}
+                placeholder="e.g. Natural Grey, Walnut, Midnight Blue"
+              />
+            </div>
+          </div>
+        </Card>
+
         {/* Organization */}
         <Card className="p-6 space-y-4">
           <h3 className="text-lg font-semibold text-text">Catalog Organization</h3>
@@ -237,6 +316,38 @@ export default function NewProductPage() {
               <label className="block text-sm font-medium mb-1 text-text">Weight (grams)</label>
               <Input type="number" {...register('weight')} placeholder="e.g. 500" />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5 text-text">Collections</label>
+            {collections.length === 0 ? (
+              <p className="text-xs text-text-tertiary italic">No collections created yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {collections.map((col) => {
+                  const isChecked = selectedCollections.includes(col._id);
+                  return (
+                    <button
+                      type="button"
+                      key={col._id}
+                      onClick={() => {
+                        setSelectedCollections((prev) =>
+                          isChecked ? prev.filter((id) => id !== col._id) : [...prev, col._id]
+                        );
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        isChecked
+                          ? 'bg-brand-50 border-brand-500 text-brand-700 font-semibold'
+                          : 'bg-surface border-border text-text-secondary hover:border-text-secondary'
+                      }`}
+                    >
+                      {isChecked ? '✓ ' : '+ '}
+                      {col.name || col.title}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>

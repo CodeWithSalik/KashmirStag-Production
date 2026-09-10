@@ -4,8 +4,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { DataTable } from '@/components/admin/data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function AdminReviewsPage() {
   const [data, setData] = useState<any[]>([]);
@@ -60,8 +61,38 @@ export default function AdminReviewsPage() {
   };
 
   const columns = [
-    { key: 'product', label: 'Product' },
-    { key: 'user', label: 'User' },
+    {
+      key: 'product',
+      label: 'Product',
+      render: (row: any) =>
+        row.productId ? (
+          <Link
+            href={`/admin/products/${row.productId}`}
+            className="text-brand-600 hover:text-brand-700 hover:underline font-medium inline-flex items-center gap-1"
+          >
+            {row.product}
+            <ExternalLink className="w-3 h-3 opacity-70" />
+          </Link>
+        ) : (
+          <span>{row.product}</span>
+        ),
+    },
+    {
+      key: 'user',
+      label: 'User',
+      render: (row: any) =>
+        row.userEmail ? (
+          <Link
+            href={`/admin/customers?search=${encodeURIComponent(row.userEmail)}`}
+            className="text-brand-600 hover:text-brand-700 hover:underline inline-flex items-center gap-1"
+          >
+            {row.user}
+            <ExternalLink className="w-3 h-3 opacity-70" />
+          </Link>
+        ) : (
+          <span>{row.user}</span>
+        ),
+    },
     { key: 'rating', label: 'Rating', render: (row: any) => `${row.rating}/5 ⭐` },
     { key: 'comment', label: 'Comment' },
     { key: 'date', label: 'Date' },

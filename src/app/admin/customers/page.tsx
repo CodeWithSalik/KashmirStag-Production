@@ -1,19 +1,23 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { DataTable } from '@/components/admin/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { RefreshCw, Search } from 'lucide-react';
+import { RefreshCw, Search, ShoppingBag } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { CURRENCY_SYMBOL, CURRENCY_SUBUNIT } from '@/config/constants';
+import Link from 'next/link';
 
-export default function AdminCustomersPage() {
+function AdminCustomersContent() {
+  const searchParams = useSearchParams();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [roleFilter, setRoleFilter] = useState('');
   const { toast } = useToast();
 
@@ -55,12 +59,39 @@ export default function AdminCustomersPage() {
         <Badge variant={row.role === 'admin' ? 'brand' : 'default'}>{row.role}</Badge>
       ),
     },
+    {
+      key: 'orders',
+      label: 'Orders',
+      render: (row: any) => (
+        <div className="text-xs">
+          <span className="font-semibold">{row.orderCount || 0}</span> orders
+          {row.totalSpent > 0 && (
+            <div className="text-text-secondary">
+              {CURRENCY_SYMBOL}{Math.round(row.totalSpent / CURRENCY_SUBUNIT).toLocaleString('en-IN')}
+            </div>
+          )}
+        </div>
+      ),
+    },
     { key: 'joined', label: 'Joined Date' },
     {
       key: 'status',
       label: 'Status',
       render: (row: any) => (
         <Badge variant={row.status === 'active' ? 'success' : 'error'}>{row.status}</Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (row: any) => (
+        <Link
+          href={`/admin/orders?customer=${encodeURIComponent(row.email)}`}
+          className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium hover:underline"
+        >
+          <ShoppingBag className="w-3.5 h-3.5" />
+          View Orders
+        </Link>
       ),
     },
   ];
@@ -114,5 +145,13 @@ export default function AdminCustomersPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function AdminCustomersPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-text-secondary">Loading customers...</div>}>
+      <AdminCustomersContent />
+    </Suspense>
   );
 }

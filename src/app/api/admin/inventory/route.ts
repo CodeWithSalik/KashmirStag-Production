@@ -21,8 +21,22 @@ export async function GET(request: NextRequest) {
       query.availableQty = 0;
     }
 
+    const search = searchParams.get('search');
+    if (search) {
+      const Product = (await import('@/models/Product')).default;
+      const matchingProducts = await Product.find({ title: { $regex: search, $options: 'i' } }, '_id').lean();
+      const prodIds = matchingProducts.map((p) => p._id);
+      query.$or = [
+        { sku: { $regex: search, $options: 'i' } },
+        { size: { $regex: search, $options: 'i' } },
+        { color: { $regex: search, $options: 'i' } },
+        { productId: { $in: prodIds } },
+      ];
+    }
+
     const variants = await ProductVariant.find(query)
       .populate('productId', 'title slug')
+      .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();

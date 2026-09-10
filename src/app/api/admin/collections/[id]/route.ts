@@ -41,6 +41,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return successResponse(result, result.message);
     }
 
+    if (body.action === 'restore' || body.isActive === true) {
+      const result = await collectionService.restoreCollection(id, user.id);
+      return successResponse(result, result.message);
+    }
+
     const collection = await collectionService.updateCollection(id, body, user.id);
     return successResponse(collection, 'Collection updated successfully');
   } catch (error) {

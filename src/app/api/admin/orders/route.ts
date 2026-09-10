@@ -15,8 +15,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(url.searchParams.get('limit') || '20', 10);
     const status = url.searchParams.get('status') || undefined;
     const paymentStatus = url.searchParams.get('paymentStatus') || undefined;
+    const customer = url.searchParams.get('customer') || undefined;
+    const search = url.searchParams.get('search') || undefined;
 
-    const { orders, total } = await getAllOrders({ page, limit, status, paymentStatus });
+    const { orders, total } = await getAllOrders({ page, limit, status, paymentStatus, customer, search });
     return successResponse({ orders, total, page, limit });
   } catch (error) {
     return handleApiError(error);

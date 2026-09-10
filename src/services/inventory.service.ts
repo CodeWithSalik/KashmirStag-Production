@@ -37,6 +37,19 @@ export const inventoryService = {
       actorId,
       note
     });
+
+    if (actorId) {
+      const { auditService } = await import('./audit.service');
+      await auditService.log(actorId, 'ADJUST_INVENTORY', 'ProductVariant', variantId, {
+        quantity,
+        type,
+        note,
+        availableQty: updated.availableQty,
+        reservedQty: updated.reservedQty,
+        sku: updated.sku,
+      });
+    }
+
     return updated;
   },
   reserveStock: async (items: { variantId: string, quantity: number }[], orderId: string, session?: mongoose.ClientSession) => {

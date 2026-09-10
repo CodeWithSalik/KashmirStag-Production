@@ -9,11 +9,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id, variantId } = await params;
     await connectDB();
-    await requireAdmin(request);
+    const user = await requireAdmin(request);
     const body = await request.json();
     const data = updateVariantSchema.parse(body);
     const variant = await ProductVariant.findOneAndUpdate({ _id: variantId, productId: id }, data, { new: true }).lean();
     if (!variant) throw new Error('Variant not found');
+    const { auditService } = await import('@/services/audit.service');
+    await auditService.log(user.id, 'UPDATE_VARIANT', 'ProductVariant', variantId, data);
     return successResponse(variant, 'Variant updated successfully');
   } catch (error) {
     return handleApiError(error);
@@ -24,9 +26,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const { id, variantId } = await params;
     await connectDB();
-    await requireAdmin(request);
+    const user = await requireAdmin(request);
     const variant = await ProductVariant.findOneAndUpdate({ _id: variantId, productId: id }, { isActive: false }, { new: true }).lean();
     if (!variant) throw new Error('Variant not found');
+    const { auditService } = await import('@/services/audit.service');
+    await auditService.log(user.id, 'DEACTIVATE_VARIANT', 'ProductVariant', variantId, { sku: variant.sku, productId: id });
     return successResponse(null, 'Variant deactivated successfully');
   } catch (error) {
     return handleApiError(error);

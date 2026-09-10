@@ -22,6 +22,13 @@ export const createProductSchema = z.object({
     description: z.string().max(160).optional(),
     keywords: z.array(z.string()).optional(),
   }).optional(),
+  // Initial inventory & variant options
+  sku: z.string().optional(),
+  initialStock: z.coerce.number().int().min(0).optional(),
+  stock: z.coerce.number().int().min(0).optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).optional(),
+  size: z.string().optional(),
+  color: z.string().optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

@@ -58,14 +58,40 @@ export async function saveUploadedFile(file: File, directory: string = 'products
   
   // Sanitize directory to prevent path traversal
   const safeDir = path.basename(directory).replace(/[^a-zA-Z0-9_-]/g, '') || 'products';
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads', safeDir);
-  
-  await fs.mkdir(uploadDir, { recursive: true });
-  
-  const filePath = path.join(uploadDir, fileName);
-  await fs.writeFile(filePath, buffer);
-  
-  return `/uploads/${safeDir}/${fileName}`;
+  const publicPath = `/uploads/${safeDir}/${fileName}`;
+
+  // 1. Attempt local filesystem storage (for local dev speed and test compatibility)
+  try {
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', safeDir);
+    await fs.mkdir(uploadDir, { recursive: true });
+    const filePath = path.join(uploadDir, fileName);
+    await fs.writeFile(filePath, buffer);
+  } catch (fsErr: any) {
+    // Expected on serverless environments (like Vercel) where filesystem is read-only
+    console.warn(`[Upload] Local disk write skipped (${fsErr.code || fsErr.message}). Using MongoDB persistence.`);
+  }
+
+  // 2. Persist in MongoDB Atlas for serverless persistence across all deployments
+  try {
+    const { connectDB } = await import('./db');
+    await connectDB();
+    const UploadedImage = (await import('@/models/UploadedImage')).default;
+    await UploadedImage.findOneAndUpdate(
+      { pathname: publicPath },
+      {
+        pathname: publicPath,
+        filename: fileName,
+        contentType: file.type || `image/${detectedFormat}`,
+        data: buffer,
+        size: buffer.length,
+      },
+      { upsert: true, new: true }
+    );
+  } catch (dbErr: any) {
+    console.error('[Upload] Failed to persist image to MongoDB Atlas:', dbErr);
+  }
+
+  return publicPath;
 }
 
 export async function deleteUploadedFile(fileUrl: string): Promise<void> {
@@ -76,14 +102,20 @@ export async function deleteUploadedFile(fileUrl: string): Promise<void> {
     const filePath = path.resolve(process.cwd(), 'public', fileUrl.replace(/^\/+/, ''));
     
     // Prevent path traversal outside of public/uploads
-    if (!filePath.startsWith(baseUploadsDir)) {
-      console.warn(`Attempted path traversal in deleteUploadedFile: ${fileUrl}`);
-      return;
+    if (filePath.startsWith(baseUploadsDir)) {
+      await fs.unlink(filePath).catch(() => {});
     }
-
-    await fs.unlink(filePath);
   } catch (error) {
-    console.error(`Failed to delete file: ${fileUrl}`, error);
+    console.error(`Failed to delete local file: ${fileUrl}`, error);
+  }
+
+  try {
+    const { connectDB } = await import('./db');
+    await connectDB();
+    const UploadedImage = (await import('@/models/UploadedImage')).default;
+    await UploadedImage.deleteOne({ pathname: fileUrl });
+  } catch (dbErr) {
+    console.error(`Failed to delete image from MongoDB: ${fileUrl}`, dbErr);
   }
 }
 

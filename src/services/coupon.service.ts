@@ -70,13 +70,41 @@ export async function recordUsage(couponIdOrCode: string, userId: string, orderI
   }
 }
 
+import AuditLog from '@/models/AuditLog';
+
 export async function createCoupon(data: any, actorId: string) {
   const coupon = await Coupon.create(data);
+  await AuditLog.create({
+    actorId,
+    action: 'CREATE_COUPON',
+    entity: 'coupon',
+    entityId: coupon._id.toString(),
+    changes: { code: coupon.code, value: coupon.value, type: coupon.type },
+  }).catch(() => {});
   return coupon;
 }
 
 export async function updateCoupon(id: string, data: any, actorId: string) {
   const coupon = await Coupon.findByIdAndUpdate(id, data, { new: true });
+  await AuditLog.create({
+    actorId,
+    action: 'UPDATE_COUPON',
+    entity: 'coupon',
+    entityId: id,
+    changes: data,
+  }).catch(() => {});
+  return coupon;
+}
+
+export async function deleteCoupon(id: string, actorId: string) {
+  const coupon = await Coupon.findByIdAndDelete(id);
+  await AuditLog.create({
+    actorId,
+    action: 'DELETE_COUPON',
+    entity: 'coupon',
+    entityId: id,
+    changes: coupon ? { code: coupon.code } : {},
+  }).catch(() => {});
   return coupon;
 }
 

@@ -80,6 +80,7 @@ export const INVENTORY_TX_TYPES = [
   'RELEASE',
   'RETURN',
   'DAMAGE',
+  'CORRECTION',
   'MANUAL_ADJUSTMENT',
 ] as const;
 

@@ -78,8 +78,37 @@ export function handleApiError(error: unknown): NextResponse {
     );
   }
 
+  // Handle Mongoose Validation Errors
+  if (error && typeof error === 'object' && (error as any).name === 'ValidationError') {
+    const mongooseErrors = (error as any).errors;
+    const messages = mongooseErrors
+      ? Object.values(mongooseErrors).map((e: any) => e.message || String(e))
+      : [(error as any).message || 'Validation failed'];
+    return NextResponse.json(
+      { success: false, error: messages.join(', '), errors: mongooseErrors },
+      { status: 400 }
+    );
+  }
+
+  // Handle Mongoose CastError (invalid ObjectId or type)
+  if (error && typeof error === 'object' && (error as any).name === 'CastError') {
+    return NextResponse.json(
+      { success: false, error: `Invalid ${(error as any).path || 'field'}: ${(error as any).value}` },
+      { status: 400 }
+    );
+  }
+
+  // Handle MongoDB E11000 duplicate key error
+  if (error && typeof error === 'object' && (error as any).code === 11000) {
+    const keyPattern = (error as any).keyPattern ? Object.keys((error as any).keyPattern).join(', ') : 'field';
+    return NextResponse.json(
+      { success: false, error: `A record with this ${keyPattern} already exists.` },
+      { status: 409 }
+    );
+  }
+
   return NextResponse.json(
-    { success: false, error: 'Internal Server Error' },
+    { success: false, error: (error as any)?.message || 'Internal Server Error' },
     { status: 500 }
   );
 }

@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Price } from "@/components/ui/price";
@@ -17,6 +20,7 @@ export type ProductCardType = {
 };
 
 export function ProductCard({ product }: { product: ProductCardType }) {
+  const [imgSrc, setImgSrc] = useState<string>(product.image || "/images/placeholder.svg");
   const hasDiscount = Boolean(product.compareAtPrice && product.compareAtPrice > product.basePrice);
   const discountPercent = hasDiscount
     ? Math.round(((product.compareAtPrice! - product.basePrice) / product.compareAtPrice!) * 100)
@@ -26,11 +30,12 @@ export function ProductCard({ product }: { product: ProductCardType }) {
     <Link href={`/product/${product.slug}`} className="group flex flex-col gap-3">
       <div className="relative aspect-square overflow-hidden rounded-lg bg-surface-secondary border border-border">
         <Image
-          src={product.image || "/images/placeholder.svg"}
+          src={imgSrc}
           alt={product.title}
           fill
           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
           className="object-cover transition-transform duration-300 group-hover:scale-105"
+          onError={() => setImgSrc("/images/placeholder.svg")}
         />
         {hasDiscount && (
           <Badge className="absolute left-2 top-2 bg-brand-600 text-white hover:bg-brand-700">

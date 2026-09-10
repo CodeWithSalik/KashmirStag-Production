@@ -41,6 +41,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return successResponse(result, result.message);
     }
 
+    if (body.action === 'restore' || body.isActive === true) {
+      const result = await categoryService.restoreCategory(id, user.id);
+      return successResponse(result, result.message);
+    }
+
     const category = await categoryService.updateCategory(id, body, user.id);
     return successResponse(category, 'Category updated successfully');
   } catch (error) {

@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { handleApiError, successResponse } from '@/lib/api-helpers';
 import { requireAdmin } from '@/lib/auth';
 import { uploadFile } from '@/lib/upload';
+import { BadRequestError } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     
-    if (!file) throw new Error('No file provided');
+    if (!file) throw new BadRequestError('No file provided');
     
     const url = await uploadFile(file);
     return successResponse({ url }, 'File uploaded successfully', 201);

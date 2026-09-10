@@ -11,8 +11,9 @@ import { useToast } from '@/hooks/use-toast';
 import { PRODUCT_STATUSES } from '@/config/constants';
 import { useRouter, useParams } from 'next/navigation';
 import { ProductImageManager } from '@/components/admin/product-image-manager';
-import { ArrowLeft, Loader2, ExternalLink, Archive, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, ExternalLink, Archive, AlertTriangle, Plus } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
+import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 
 const formSchema = z.object({
@@ -39,12 +40,30 @@ export default function EditProductPage() {
 
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<any[]>([]);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [images, setImages] = useState<string[]>([]);
+  const [variants, setVariants] = useState<any[]>([]);
   const [productSlug, setProductSlug] = useState('');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
 
-  const { register, handleSubmit, setValue, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  // Stock adjustment state
+  const [adjustingVariantId, setAdjustingVariantId] = useState<string | null>(null);
+  const [stockAdjustment, setStockAdjustment] = useState<number>(0);
+  const [adjustReason, setAdjustReason] = useState<string>('');
+  const [provisioning, setProvisioning] = useState<boolean>(false);
+
+  // Add Variant modal state
+  const [showAddVariantModal, setShowAddVariantModal] = useState(false);
+  const [newVariantSku, setNewVariantSku] = useState('');
+  const [newVariantSize, setNewVariantSize] = useState('');
+  const [newVariantColor, setNewVariantColor] = useState('');
+  const [newVariantPrice, setNewVariantPrice] = useState<number>(0);
+  const [newVariantStock, setNewVariantStock] = useState<number>(10);
+  const [creatingVariant, setCreatingVariant] = useState(false);
+
+  const { register, handleSubmit, setValue, reset, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       status: 'active',
@@ -53,58 +72,172 @@ export default function EditProductPage() {
     }
   });
 
-  // Fetch product data and categories on load
-  useEffect(() => {
-    async function loadData() {
-      if (!id) return;
-      setLoading(true);
-      try {
-        const [prodRes, catRes] = await Promise.all([
-          fetch(`/api/admin/products/${id}`),
-          fetch('/api/admin/categories')
-        ]);
+  const loadData = React.useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const [prodRes, catRes, colRes] = await Promise.all([
+        fetch(`/api/admin/products/${id}`),
+        fetch('/api/admin/categories'),
+        fetch('/api/admin/collections'),
+      ]);
 
-        if (catRes.ok) {
-          const catJson = await catRes.json();
-          setCategories(catJson.data || []);
-        }
-
-        if (!prodRes.ok) {
-          throw new Error('Failed to load product details');
-        }
-
-        const prodJson = await prodRes.json();
-        const p = prodJson.data;
-
-        setProductSlug(p.slug || '');
-        setImages(Array.isArray(p.images) ? p.images : []);
-
-        reset({
-          title: p.title || '',
-          slug: p.slug || '',
-          description: p.description || '',
-          shortDescription: p.shortDescription || '',
-          basePrice: p.basePrice || 0,
-          compareAtPrice: p.compareAtPrice || 0,
-          costPrice: p.costPrice || 0,
-          categoryId: p.categoryId?._id || p.categoryId || 'none',
-          status: p.status || 'active',
-          weight: p.weight || 0,
-          tags: Array.isArray(p.tags) ? p.tags.join(', ') : '',
-        });
-      } catch (err: any) {
-        toast({
-          title: 'Error Loading Product',
-          description: err.message || 'Could not fetch product information.',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
+      if (catRes.ok) {
+        const catJson = await catRes.json();
+        setCategories(catJson.data || []);
       }
-    }
 
-    loadData();
+      if (colRes.ok) {
+        const colJson = await colRes.json();
+        setCollections(colJson.data || []);
+      }
+
+      if (!prodRes.ok) {
+        throw new Error('Failed to load product details');
+      }
+
+      const prodJson = await prodRes.json();
+      const p = prodJson.data;
+
+      setProductSlug(p.slug || '');
+      setImages(Array.isArray(p.images) ? p.images : []);
+      setVariants(Array.isArray(p.variants) ? p.variants : []);
+
+      const existingColIds = Array.isArray(p.collectionIds)
+        ? p.collectionIds.map((c: any) => (typeof c === 'object' && c !== null ? c._id : c))
+        : [];
+      setSelectedCollections(existingColIds);
+
+      reset({
+        title: p.title || '',
+        slug: p.slug || '',
+        description: p.description || '',
+        shortDescription: p.shortDescription || '',
+        basePrice: p.basePrice || 0,
+        compareAtPrice: p.compareAtPrice || 0,
+        costPrice: p.costPrice || 0,
+        categoryId: p.categoryId?._id || p.categoryId || 'none',
+        status: p.status || 'active',
+        weight: p.weight || 0,
+        tags: Array.isArray(p.tags) ? p.tags.join(', ') : '',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error Loading Product',
+        description: err.message || 'Could not fetch product information.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [id, reset, toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleProvisionDefaultVariant = async () => {
+    setProvisioning(true);
+    try {
+      const res = await fetch(`/api/admin/products/${id}/variants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku: `KS-${(productSlug || 'PROD').substring(0, 8).toUpperCase().replace(/[^A-Z0-9]/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+          availableQty: 10,
+          price: watch('basePrice') || 0,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to provision variant');
+      toast({ title: 'Variant Created', description: 'Default variant provisioned with 10 units in stock.' });
+      loadData();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setProvisioning(false);
+    }
+  };
+
+  const handleCreateNewVariant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVariantSku.trim()) {
+      toast({ title: 'Validation Error', description: 'SKU is required', variant: 'destructive' });
+      return;
+    }
+    setCreatingVariant(true);
+    try {
+      const res = await fetch(`/api/admin/products/${id}/variants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku: newVariantSku.trim().toUpperCase(),
+          size: newVariantSize.trim() || undefined,
+          color: newVariantColor.trim() || undefined,
+          price: Number(newVariantPrice) || Number(watch('basePrice')) || 0,
+          availableQty: Number(newVariantStock) || 0,
+          isActive: true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to create variant');
+      toast({ title: 'Variant Added', description: `Variant ${newVariantSku} created with ${newVariantStock} stock.` });
+      setShowAddVariantModal(false);
+      setNewVariantSku('');
+      setNewVariantSize('');
+      setNewVariantColor('');
+      setNewVariantStock(10);
+      loadData();
+    } catch (err: any) {
+      toast({ title: 'Failed to Add Variant', description: err.message, variant: 'destructive' });
+    } finally {
+      setCreatingVariant(false);
+    }
+  };
+
+  const handleToggleVariantActive = async (v: any) => {
+    try {
+      const nextActive = v.isActive === false;
+      const res = await fetch(`/api/admin/products/${id}/variants/${v._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: nextActive }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to update variant');
+      toast({
+        title: nextActive ? 'Variant Activated' : 'Variant Deactivated',
+        description: `Variant "${v.sku}" is now ${nextActive ? 'active' : 'inactive'}.`,
+      });
+      loadData();
+    } catch (err: any) {
+      toast({ title: 'Update Failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleStockAdjust = async (variantId: string) => {
+    if (stockAdjustment === 0) return;
+    try {
+      const res = await fetch(`/api/admin/inventory/${variantId}/adjust`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quantity: stockAdjustment,
+          type: stockAdjustment > 0 ? 'PURCHASE' : 'DAMAGE',
+          note: adjustReason || 'Manual adjustment via product edit page',
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to adjust stock');
+      toast({ title: 'Stock Updated', description: 'Inventory quantity updated successfully.' });
+      setAdjustingVariantId(null);
+      setStockAdjustment(0);
+      setAdjustReason('');
+      loadData();
+    } catch (err: any) {
+      toast({ title: 'Adjustment Failed', description: err.message, variant: 'destructive' });
+    }
+  };
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -132,6 +265,8 @@ export default function EditProductPage() {
       } else {
         payload.tags = [];
       }
+
+      payload.collectionIds = selectedCollections;
 
       const res = await fetch(`/api/admin/products/${id}`, {
         method: 'PUT',
@@ -254,6 +389,198 @@ export default function EditProductPage() {
           </div>
         </Card>
 
+        {/* Inventory & Variants */}
+        <Card className="p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-text">Inventory &amp; Variants</h3>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Manage sellable stock units, SKUs, and inventory reservations
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setShowAddVariantModal(true)}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Variant
+              </Button>
+              {variants.length === 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleProvisionDefaultVariant}
+                  disabled={provisioning}
+                >
+                  {provisioning ? 'Provisioning...' : 'Provision Default Variant (10 Units)'}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {variants.length === 0 ? (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-amber-950">No Inventory Variants Found</p>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  This product has 0 variants, causing it to display as &quot;Out of Stock&quot; on the storefront.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleProvisionDefaultVariant}
+                disabled={provisioning}
+                className="bg-white hover:bg-amber-100 whitespace-nowrap"
+              >
+                Create Variant &amp; Set Stock
+              </Button>
+            </div>
+          ) : (
+            <div className="border border-border rounded-lg overflow-hidden">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-surface-secondary text-xs uppercase text-text-secondary border-b border-border">
+                  <tr>
+                    <th className="p-3">SKU</th>
+                    <th className="p-3">Variant / Options</th>
+                    <th className="p-3">Available</th>
+                    <th className="p-3">Reserved</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {variants.map((v) => {
+                    const isAdjusting = adjustingVariantId === v._id;
+                    const isLow = (v.availableQty ?? 0) <= (v.lowStockThreshold ?? 5);
+                    const isOut = (v.availableQty ?? 0) === 0;
+
+                    return (
+                      <React.Fragment key={v._id}>
+                        <tr className="hover:bg-surface-secondary/50">
+                          <td className="p-3 font-mono text-xs">
+                            <Link
+                              href={`/admin/inventory?search=${v.sku}`}
+                              className="text-brand-600 hover:underline font-semibold"
+                              title="View this variant in Inventory management"
+                            >
+                              {v.sku}
+                            </Link>
+                          </td>
+                          <td className="p-3">{[v.size, v.color].filter(Boolean).join(' / ') || 'Standard'}</td>
+                          <td className="p-3 font-semibold">{v.availableQty ?? 0}</td>
+                          <td className="p-3 text-text-secondary">{v.reservedQty ?? 0}</td>
+                          <td className="p-3">
+                            <div className="flex flex-wrap gap-1 items-center">
+                              {isOut ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800">
+                                  Out of Stock
+                                </span>
+                              ) : isLow ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800">
+                                  Low Stock
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800">
+                                  In Stock
+                                </span>
+                              )}
+                              <Badge variant={v.isActive === false ? 'default' : 'success'} className="text-[10px]">
+                                {v.isActive === false ? 'Inactive' : 'Active'}
+                              </Badge>
+                            </div>
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setAdjustingVariantId(isAdjusting ? null : v._id);
+                                  setStockAdjustment(0);
+                                  setAdjustReason('');
+                                }}
+                                className="text-xs"
+                              >
+                                {isAdjusting ? 'Close' : 'Adjust Stock'}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleVariantActive(v)}
+                                className="text-xs text-text-secondary hover:text-text"
+                                title={v.isActive === false ? 'Activate variant' : 'Deactivate variant'}
+                              >
+                                {v.isActive === false ? 'Activate' : 'Deactivate'}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                                className="text-xs text-brand-600 hover:text-brand-700"
+                              >
+                                <Link href={`/admin/inventory?search=${v.sku}`} title="Jump to Inventory">
+                                  Inventory →
+                                </Link>
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {isAdjusting && (
+                          <tr className="bg-surface-secondary/70">
+                            <td colSpan={6} className="p-4">
+                              <div className="flex flex-col sm:flex-row items-center gap-3">
+                                <div className="w-full sm:w-44">
+                                  <label className="block text-[11px] font-medium text-text mb-1">
+                                    Quantity (+ to add, - to reduce)
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    value={stockAdjustment || ''}
+                                    onChange={(e) => setStockAdjustment(parseInt(e.target.value, 10) || 0)}
+                                    placeholder="+10 or -2"
+                                  />
+                                </div>
+                                <div className="w-full sm:flex-1">
+                                  <label className="block text-[11px] font-medium text-text mb-1">
+                                    Reason / Note
+                                  </label>
+                                  <Input
+                                    value={adjustReason}
+                                    onChange={(e) => setAdjustReason(e.target.value)}
+                                    placeholder="e.g. Restocked 20 units from workshop"
+                                  />
+                                </div>
+                                <div className="flex gap-2 self-end pt-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={stockAdjustment === 0}
+                                    onClick={() => handleStockAdjust(v._id)}
+                                  >
+                                    Apply Adjustment
+                                  </Button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
         {/* Organization */}
         <Card className="p-6 space-y-4">
           <h3 className="text-lg font-semibold text-text">Catalog Organization</h3>
@@ -289,6 +616,38 @@ export default function EditProductPage() {
               <label className="block text-sm font-medium mb-1 text-text">Weight (grams)</label>
               <Input type="number" {...register('weight')} />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5 text-text">Collections</label>
+            {collections.length === 0 ? (
+              <p className="text-xs text-text-tertiary italic">No collections created yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {collections.map((col) => {
+                  const isChecked = selectedCollections.includes(col._id);
+                  return (
+                    <button
+                      type="button"
+                      key={col._id}
+                      onClick={() => {
+                        setSelectedCollections((prev) =>
+                          isChecked ? prev.filter((id) => id !== col._id) : [...prev, col._id]
+                        );
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        isChecked
+                          ? 'bg-brand-50 border-brand-500 text-brand-700 font-semibold'
+                          : 'bg-surface border-border text-text-secondary hover:border-text-secondary'
+                      }`}
+                    >
+                      {isChecked ? '✓ ' : '+ '}
+                      {col.name || col.title}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>
@@ -382,6 +741,86 @@ export default function EditProductPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Add New Variant Modal */}
+      <Modal
+        isOpen={showAddVariantModal}
+        onClose={() => {
+          if (!creatingVariant) setShowAddVariantModal(false);
+        }}
+        title="Add Sellable Variant"
+        size="md"
+      >
+        <form onSubmit={handleCreateNewVariant} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-text mb-1">
+              SKU <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={newVariantSku}
+              onChange={(e) => setNewVariantSku(e.target.value)}
+              placeholder="e.g. KS-SHAWL-NAVY-M"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-text mb-1">Size / Dimension</label>
+              <Input
+                value={newVariantSize}
+                onChange={(e) => setNewVariantSize(e.target.value)}
+                placeholder="e.g. M, L, Free Size"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text mb-1">Color / Pattern</label>
+              <Input
+                value={newVariantColor}
+                onChange={(e) => setNewVariantColor(e.target.value)}
+                placeholder="e.g. Navy Blue, Walnut"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-text mb-1">Price (Paise)</label>
+              <Input
+                type="number"
+                value={newVariantPrice || ''}
+                onChange={(e) => setNewVariantPrice(parseInt(e.target.value, 10) || 0)}
+                placeholder="Leave blank to use Base Price"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text mb-1">Initial Stock (Units)</label>
+              <Input
+                type="number"
+                value={newVariantStock}
+                onChange={(e) => setNewVariantStock(parseInt(e.target.value, 10) || 0)}
+                min="0"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddVariantModal(false)}
+              disabled={creatingVariant}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={creatingVariant || !newVariantSku.trim()}>
+              {creatingVariant ? 'Creating Variant...' : 'Create Variant'}
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

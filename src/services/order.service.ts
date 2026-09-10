@@ -38,12 +38,36 @@ export async function getOrdersByEmail(email: string, page: number, limit: numbe
   return { orders, total };
 }
 
-export async function getAllOrders(params: { page: number, limit: number, status?: string, paymentStatus?: string }) {
-  const { page, limit, status, paymentStatus } = params;
+export async function getAllOrders(params: {
+  page: number;
+  limit: number;
+  status?: string;
+  paymentStatus?: string;
+  customer?: string;
+  search?: string;
+}) {
+  const { page, limit, status, paymentStatus, customer, search } = params;
   const skip = (page - 1) * limit;
   const query: any = {};
   if (status) query.status = status;
   if (paymentStatus) query.paymentStatus = paymentStatus;
+
+  if (customer) {
+    if (mongoose.Types.ObjectId.isValid(customer)) {
+      query.$or = [{ userId: new mongoose.Types.ObjectId(customer) }, { email: customer }];
+    } else {
+      query.email = { $regex: customer, $options: 'i' };
+    }
+  }
+
+  if (search) {
+    query.$or = [
+      { orderId: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+      { 'shippingAddress.name': { $regex: search, $options: 'i' } },
+      { 'shippingAddress.phone': { $regex: search, $options: 'i' } },
+    ];
+  }
 
   const orders = await Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit);
   const total = await Order.countDocuments(query);
@@ -128,10 +152,20 @@ export async function updateOrderStatus(orderId: string, newStatus: any, actorId
     throw new AppError(`Cannot transition order status from '${order.status}' to '${newStatus}'`, 400);
   }
 
+  const oldStatus = order.status;
   order.status = newStatus;
   order.timeline.push({ status: newStatus, comment, actorId: toObjectId(actorId), createdAt: new Date() });
   await order.save();
 
+  if (actorId) {
+    const { auditService } = await import('./audit.service');
+    await auditService.log(actorId, 'UPDATE_ORDER_STATUS', 'Order', order._id || order.orderId, {
+      from: oldStatus,
+      to: newStatus,
+      comment,
+      orderId: order.orderId,
+    });
+  }
 
   // Transactional Email Triggers
   if (newStatus === 'processing') {
@@ -167,6 +201,15 @@ export async function addTrackingInfo(orderId: string, carrier: string, tracking
   order.status = 'shipped';
 
   await order.save();
+
+  if (actorId) {
+    const { auditService } = await import('./audit.service');
+    await auditService.log(actorId, 'ADD_TRACKING', 'Order', order._id || order.orderId, {
+      carrier,
+      trackingNumber,
+      orderId: order.orderId,
+    });
+  }
 
   await recordAndSendOrderNotification(order, 'shipped', () =>
     sendShippingNotification(order.email, order, { carrier, trackingNumber, trackingUrl })
@@ -212,6 +255,14 @@ export async function cancelOrder(orderId: string, reason: string, actorId?: str
   order.cancellation = { reason, requestedAt: new Date() };
   order.timeline.push({ status: 'cancelled', comment: reason, actorId: toObjectId(actorId), createdAt: new Date() });
   await order.save();
+
+  if (actorId) {
+    const { auditService } = await import('./audit.service');
+    await auditService.log(actorId, 'CANCEL_ORDER', 'Order', order._id || order.orderId, {
+      reason,
+      orderId: order.orderId,
+    });
+  }
 
 
   await recordAndSendOrderNotification(order, 'cancelled', () =>

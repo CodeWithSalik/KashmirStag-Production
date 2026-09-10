@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
       limit: Number(searchParams.get('limit')) || 20,
       search: searchParams.get('search'),
       category: searchParams.get('category'),
+      collection: searchParams.get('collection'),
       status: searchParams.get('status'),
     };
     const result = await productService.getProducts(params);

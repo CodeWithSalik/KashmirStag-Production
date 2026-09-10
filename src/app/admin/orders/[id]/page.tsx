@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { ORDER_STATUSES, CURRENCY_SYMBOL, CURRENCY_SUBUNIT } from '@/config/constants';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -152,7 +152,17 @@ export default function OrderDetailPage() {
                       <img src={item.image} alt={item.title} className="w-12 h-12 rounded object-cover border border-border" />
                     )}
                     <div>
-                      <div className="font-medium text-sm text-text">{item.title}</div>
+                      {item.productId ? (
+                        <Link
+                          href={`/admin/products/${item.productId}`}
+                          className="font-medium text-sm text-text hover:text-brand-500 hover:underline inline-flex items-center gap-1"
+                        >
+                          {item.title}
+                          <ExternalLink className="w-3 h-3 opacity-70" />
+                        </Link>
+                      ) : (
+                        <div className="font-medium text-sm text-text">{item.title}</div>
+                      )}
                       {item.variant && <div className="text-xs text-text-secondary">{item.variant}</div>}
                       <div className="text-xs text-text-tertiary">SKU: {item.sku} | Qty: {item.quantity}</div>
                     </div>
@@ -192,7 +202,16 @@ export default function OrderDetailPage() {
             <h2 className="text-lg font-semibold">Customer & Shipping</h2>
             <div className="text-sm space-y-1 text-text-secondary">
               <p><strong>Name:</strong> {order.shippingAddress?.name}</p>
-              <p><strong>Email:</strong> {order.email}</p>
+              <p>
+                <strong>Email:</strong>{' '}
+                <Link
+                  href={`/admin/customers?search=${encodeURIComponent(order.email || '')}`}
+                  className="text-brand-500 hover:underline inline-flex items-center gap-1"
+                >
+                  {order.email}
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              </p>
               <p><strong>Phone:</strong> {order.shippingAddress?.phone}</p>
               <div className="pt-2 border-t border-border">
                 <p>{order.shippingAddress?.line1}</p>

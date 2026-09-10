@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
-import { Plus, RefreshCw, Trash2, Edit, AlertTriangle } from 'lucide-react';
+import { Plus, RefreshCw, Trash2, Edit, AlertTriangle, Archive, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function AdminCollectionsPage() {
   const [data, setData] = useState<any[]>([]);
@@ -135,10 +136,46 @@ export default function AdminCollectionsPage() {
     }
   };
 
+  const handleToggleArchive = async (col: any) => {
+    try {
+      const nextAction = col.status === 'active' ? 'archive' : 'restore';
+      const res = await fetch(`/api/admin/collections/${col.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: nextAction }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to update collection status');
+      toast({
+        title: col.status === 'active' ? 'Collection Archived' : 'Collection Restored',
+        description: json.message || `Collection status updated.`,
+      });
+      fetchCollections();
+    } catch (err: any) {
+      toast({
+        title: 'Update Failed',
+        description: err.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const columns = [
     { key: 'title', label: 'Title' },
     { key: 'slug', label: 'Slug' },
-    { key: 'productsCount', label: 'Products' },
+    {
+      key: 'productsCount',
+      label: 'Products',
+      render: (row: any) => (
+        <Link
+          href={`/admin/products?collection=${row.id}`}
+          className="text-brand-600 hover:underline font-medium inline-flex items-center gap-1"
+          title="Filter products by this collection"
+        >
+          {row.productsCount} {row.productsCount === 1 ? 'product' : 'products'}
+        </Link>
+      ),
+    },
     {
       key: 'status',
       label: 'Status',
@@ -151,6 +188,11 @@ export default function AdminCollectionsPage() {
       label: 'Actions',
       render: (row: any) => (
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/admin/products?collection=${row.id}`}>
+              View Products
+            </Link>
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -161,6 +203,18 @@ export default function AdminCollectionsPage() {
             }}
           >
             <Edit className="w-3.5 h-3.5 mr-1" /> Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleToggleArchive(row)}
+            title={row.status === 'active' ? 'Archive collection' : 'Restore collection'}
+          >
+            {row.status === 'active' ? (
+              <><Archive className="w-3.5 h-3.5 mr-1" /> Archive</>
+            ) : (
+              <><RotateCcw className="w-3.5 h-3.5 mr-1" /> Restore</>
+            )}
           </Button>
           <Button
             variant="ghost"

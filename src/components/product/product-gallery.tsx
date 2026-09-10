@@ -10,6 +10,12 @@ interface ProductGalleryProps {
 
 export function ProductGallery({ images, title }: ProductGalleryProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [errorMap, setErrorMap] = useState<Record<number, boolean>>({});
+
+  const getImageSrc = (index: number) => {
+    if (errorMap[index]) return "/images/placeholder.svg";
+    return images[index] || "/images/placeholder.svg";
+  };
 
   if (!images?.length) {
     return (
@@ -29,12 +35,13 @@ export function ProductGallery({ images, title }: ProductGalleryProps) {
       {/* Main Image */}
       <div className="relative aspect-square w-full flex-1 overflow-hidden rounded-lg bg-surface-100 group">
         <Image
-          src={images[currentIndex]}
+          src={getImageSrc(currentIndex)}
           alt={`${title} - Image ${currentIndex + 1}`}
           fill
           priority
           sizes="(max-width: 768px) 100vw, 50vw"
           className="object-cover transition-transform duration-500 group-hover:scale-110"
+          onError={() => setErrorMap((prev) => ({ ...prev, [currentIndex]: true }))}
         />
       </div>
 
@@ -52,11 +59,12 @@ export function ProductGallery({ images, title }: ProductGalleryProps) {
               aria-label={`View image ${index + 1}`}
             >
               <Image
-                src={image}
+                src={getImageSrc(index)}
                 alt={`Thumbnail ${index + 1}`}
                 fill
                 sizes="80px"
                 className="object-cover"
+                onError={() => setErrorMap((prev) => ({ ...prev, [index]: true }))}
               />
             </button>
           ))}

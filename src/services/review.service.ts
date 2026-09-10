@@ -1,14 +1,24 @@
 import { connectDB } from "@/lib/db";
 import Review from '@/models/Review';
 import Product from '@/models/Product';
+import AuditLog from '@/models/AuditLog';
 import mongoose from 'mongoose';
 
 export const ReviewService = {
-  async moderateReview(reviewId: string, status: 'approved' | 'rejected') {
+  async moderateReview(reviewId: string, status: 'approved' | 'rejected', actorId?: string) {
     await connectDB();
     const review = await Review.findByIdAndUpdate(reviewId, { status }, { new: true });
-    if (review && status === 'approved') {
+    if (review) {
       await this.calculateProductRating(review.productId.toString());
+      if (actorId) {
+        await AuditLog.create({
+          actorId,
+          action: 'MODERATE_REVIEW',
+          entity: 'review',
+          entityId: reviewId,
+          changes: { status, productId: review.productId },
+        }).catch(() => {});
+      }
     }
     return review;
   },
