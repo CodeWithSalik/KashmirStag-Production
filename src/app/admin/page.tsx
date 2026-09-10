@@ -15,23 +15,39 @@ export const dynamic = 'force-dynamic';
 export default async function AdminDashboardPage() {
   await connectDB();
 
-  // Aggregate live metrics from MongoDB
-  const [revenueAgg, ordersCount, customersCount, pendingOrdersCount, recentOrdersDocs, lowStockVariants] = await Promise.all([
-    Order.aggregate([
-      { $match: { paymentStatus: 'paid' } },
-      { $group: { _id: null, totalRevenue: { $sum: '$pricing.total' } } }
-    ]),
-    Order.countDocuments(),
-    User.countDocuments({ role: 'customer' }),
-    Order.countDocuments({ status: 'pending' }),
-    Order.find().sort({ createdAt: -1 }).limit(5).lean(),
-    ProductVariant.find({ $expr: { $lte: ['$availableQty', '$lowStockThreshold'] } })
-      .populate('productId', 'title')
-      .limit(5)
-      .lean()
-  ]);
+  let totalRevenue = 0;
+  let ordersCount = 0;
+  let customersCount = 0;
+  let pendingOrdersCount = 0;
+  let recentOrdersDocs: any[] = [];
+  let lowStockVariants: any[] = [];
 
-  const totalRevenue = revenueAgg[0]?.totalRevenue || 0;
+  try {
+    const [revenueAgg, oCount, cCount, pCount, rOrders, lVariants] = await Promise.all([
+      Order.aggregate([
+        { $match: { paymentStatus: 'paid' } },
+        { $group: { _id: null, totalRevenue: { $sum: '$pricing.total' } } }
+      ]).catch(() => []),
+      Order.countDocuments().catch(() => 0),
+      User.countDocuments({ role: 'customer' }).catch(() => 0),
+      Order.countDocuments({ status: 'pending' }).catch(() => 0),
+      Order.find().sort({ createdAt: -1 }).limit(5).lean().catch(() => []),
+      ProductVariant.find({ $expr: { $lte: ['$availableQty', { $ifNull: ['$lowStockThreshold', 5] }] } })
+        .populate('productId', 'title')
+        .limit(5)
+        .lean()
+        .catch(() => [])
+    ]);
+
+    totalRevenue = revenueAgg[0]?.totalRevenue || 0;
+    ordersCount = oCount;
+    customersCount = cCount;
+    pendingOrdersCount = pCount;
+    recentOrdersDocs = rOrders;
+    lowStockVariants = lVariants;
+  } catch (err) {
+    console.error('[AdminDashboard] Error loading metrics:', err);
+  }
 
   const recentOrders = recentOrdersDocs.map((o: any) => ({
     id: o.orderId,
