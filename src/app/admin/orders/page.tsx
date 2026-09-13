@@ -6,7 +6,7 @@ import { DataTable } from '@/components/admin/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CURRENCY_SYMBOL, CURRENCY_SUBUNIT } from '@/config/constants';
+import { ORDER_STATUSES, CURRENCY_SYMBOL, CURRENCY_SUBUNIT } from '@/config/constants';
 import Link from 'next/link';
 import { RefreshCw, Search, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -28,9 +28,9 @@ function AdminOrdersContent() {
     const cust = searchParams.get('customer');
     const stat = searchParams.get('status');
     const s = searchParams.get('search');
-    if (cust !== null && cust !== customerFilter) setCustomerFilter(cust);
-    if (stat !== null && stat !== statusFilter) setStatusFilter(stat);
-    if (s !== null && s !== searchTerm) setSearchTerm(s);
+    if (cust !== null) setCustomerFilter((prev) => (prev !== cust ? cust : prev));
+    if (stat !== null) setStatusFilter((prev) => (prev !== stat ? stat : prev));
+    if (s !== null) setSearchTerm((prev) => (prev !== s ? s : prev));
   }, [searchParams]);
 
   const fetchOrders = useCallback(async () => {
@@ -189,12 +189,11 @@ function AdminOrdersContent() {
             className="w-full p-2.5 border border-border rounded-lg bg-surface text-text text-xs focus:outline-none focus:ring-2 focus:ring-brand-600"
           >
             <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
+            {ORDER_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+              </option>
+            ))}
           </select>
         </div>
 

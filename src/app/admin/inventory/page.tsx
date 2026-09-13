@@ -38,8 +38,8 @@ function AdminInventoryContent() {
 
   useEffect(() => {
     const q = searchParams.get('search');
-    if (q !== null && q !== searchTerm) {
-      setSearchTerm(q);
+    if (q !== null) {
+      setSearchTerm((prev) => (prev !== q ? q : prev));
     }
   }, [searchParams]);
 

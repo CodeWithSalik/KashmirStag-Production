@@ -7,8 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ORDER_STATUSES, CURRENCY_SYMBOL, CURRENCY_SUBUNIT } from '@/config/constants';
+import {
+  ORDER_STATUSES,
+  OrderStatus,
+  CURRENCY_SYMBOL,
+  CURRENCY_SUBUNIT,
+  getAvailableTransitions,
+  isCancellableStatus,
+} from '@/config/constants';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 
 export default function OrderDetailPage() {
@@ -56,10 +64,25 @@ export default function OrderDetailPage() {
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, comment: statusComment }),
+        body: JSON.stringify({
+          status,
+          comment: statusComment || undefined,
+          expectedCurrentStatus: order.status,
+        }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to update order status');
+      if (!res.ok) {
+        if (res.status === 409) {
+          toast({
+            title: 'Status Conflict',
+            description: json.error || 'Another transaction updated this order. Refreshed with latest data.',
+            variant: 'destructive',
+          });
+          fetchOrder();
+          return;
+        }
+        throw new Error(json.error || 'Failed to update order status');
+      }
       toast({ title: 'Success', description: `Order status updated to ${status}` });
       setStatusComment('');
       fetchOrder();
@@ -83,7 +106,18 @@ export default function OrderDetailPage() {
         body: JSON.stringify({ carrier, trackingNumber, trackingUrl: trackingUrl || undefined }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to update tracking');
+      if (!res.ok) {
+        if (res.status === 409) {
+          toast({
+            title: 'Status Conflict',
+            description: json.error || 'Another transaction updated this order. Refreshed with latest data.',
+            variant: 'destructive',
+          });
+          fetchOrder();
+          return;
+        }
+        throw new Error(json.error || 'Failed to update tracking');
+      }
       toast({ title: 'Success', description: 'Tracking information added and order marked shipped' });
       fetchOrder();
     } catch (err: any) {
@@ -100,10 +134,25 @@ export default function OrderDetailPage() {
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'cancelled', comment: 'Cancelled by admin from dashboard' }),
+        body: JSON.stringify({
+          status: 'cancelled',
+          comment: 'Cancelled by admin from dashboard',
+          expectedCurrentStatus: order.status,
+        }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to cancel order');
+      if (!res.ok) {
+        if (res.status === 409) {
+          toast({
+            title: 'Status Conflict',
+            description: json.error || 'Another transaction updated this order. Refreshed with latest data.',
+            variant: 'destructive',
+          });
+          fetchOrder();
+          return;
+        }
+        throw new Error(json.error || 'Failed to cancel order');
+      }
       toast({ title: 'Order Cancelled', description: 'Order cancelled and inventory updated' });
       fetchOrder();
     } catch (err: any) {
@@ -133,7 +182,7 @@ export default function OrderDetailPage() {
             Payment: {order.paymentStatus}
           </Badge>
         </div>
-        {order.status !== 'cancelled' && order.status !== 'delivered' && (
+        {order && isCancellableStatus(order.status) && (
           <Button variant="outline" className="text-red-500 border-red-500 hover:bg-red-50" onClick={handleCancelOrder} disabled={updating}>
             Cancel Order
           </Button>
@@ -149,7 +198,7 @@ export default function OrderDetailPage() {
                 <div key={idx} className="py-3 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     {item.image && (
-                      <img src={item.image} alt={item.title} className="w-12 h-12 rounded object-cover border border-border" />
+                      <Image src={item.image} alt={item.title} width={48} height={48} className="w-12 h-12 rounded object-cover border border-border shrink-0" />
                     )}
                     <div>
                       {item.productId ? (
@@ -221,52 +270,94 @@ export default function OrderDetailPage() {
             </div>
           </Card>
 
-          <Card className="p-6 space-y-4">
-            <h2 className="text-lg font-semibold">Update Status</h2>
-            <div className="space-y-3">
-              <select 
-                value={status} 
-                onChange={(e) => setStatus(e.target.value)}
-                className="p-2 border border-border rounded-md bg-transparent w-full text-sm"
-              >
-                {ORDER_STATUSES.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <Input
-                placeholder="Comment (optional)"
-                value={statusComment}
-                onChange={(e) => setStatusComment(e.target.value)}
-              />
-              <Button onClick={handleUpdateStatus} disabled={updating || status === order.status} className="w-full">
-                {updating ? 'Updating...' : 'Update Status'}
-              </Button>
-            </div>
-          </Card>
+          {(() => {
+            const availableTransitions = order ? getAvailableTransitions(order.status, order.paymentStatus) : [];
+            const isTerminal = availableTransitions.length === 0;
 
-          <Card className="p-6 space-y-4">
-            <h2 className="text-lg font-semibold">Fulfillment & Tracking</h2>
-            <div className="space-y-3">
-              <Input 
-                value={carrier} 
-                onChange={(e) => setCarrier(e.target.value)} 
-                placeholder="Carrier (e.g. BlueDart, Delhivery)" 
-              />
-              <Input 
-                value={trackingNumber} 
-                onChange={(e) => setTrackingNumber(e.target.value)} 
-                placeholder="Tracking Number" 
-              />
-              <Input 
-                value={trackingUrl} 
-                onChange={(e) => setTrackingUrl(e.target.value)} 
-                placeholder="Tracking URL (optional)" 
-              />
-              <Button onClick={handleAddTracking} disabled={updating || !carrier || !trackingNumber} className="w-full">
-                {updating ? 'Saving...' : 'Save & Mark Shipped'}
-              </Button>
-            </div>
-          </Card>
+            return (
+              <Card className="p-6 space-y-4">
+                <h2 className="text-lg font-semibold">Update Status</h2>
+                <div className="space-y-3">
+                  {isTerminal ? (
+                    <div className="text-sm text-text-secondary bg-surface-secondary p-3 rounded-md border border-border">
+                      Order has reached a terminal status (<strong className="capitalize">{order.status}</strong>). No further status updates are allowed.
+                    </div>
+                  ) : (
+                    <>
+                      <select 
+                        value={status} 
+                        onChange={(e) => setStatus(e.target.value)}
+                        className="p-2 border border-border rounded-md bg-transparent w-full text-sm"
+                        disabled={updating}
+                      >
+                        <option value={order.status}>{order.status} (current)</option>
+                        {availableTransitions.map(s => (
+                          <option key={s} value={s}>→ {s}</option>
+                        ))}
+                      </select>
+                      <Input
+                        placeholder="Comment (optional)"
+                        value={statusComment}
+                        onChange={(e) => setStatusComment(e.target.value)}
+                        disabled={updating}
+                      />
+                      <Button
+                        onClick={handleUpdateStatus}
+                        disabled={updating || status === order.status}
+                        className="w-full"
+                      >
+                        {updating ? 'Updating...' : `Transition to ${status}`}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </Card>
+            );
+          })()}
+
+          {(() => {
+            const canAddTracking = order && ['packed', 'processing', 'shipped'].includes(order.status);
+            return (
+              <Card className="p-6 space-y-4">
+                <h2 className="text-lg font-semibold">Fulfillment & Tracking</h2>
+                <div className="space-y-3">
+                  {!canAddTracking ? (
+                    <div className="text-sm text-text-secondary bg-surface-secondary p-3 rounded-md border border-border">
+                      Fulfillment tracking can only be added when the order is <strong>processing</strong>, <strong>packed</strong>, or <strong>shipped</strong>.
+                    </div>
+                  ) : (
+                    <>
+                      <Input 
+                        value={carrier} 
+                        onChange={(e) => setCarrier(e.target.value)} 
+                        placeholder="Carrier (e.g. BlueDart, Delhivery)" 
+                        disabled={updating}
+                      />
+                      <Input 
+                        value={trackingNumber} 
+                        onChange={(e) => setTrackingNumber(e.target.value)} 
+                        placeholder="Tracking Number" 
+                        disabled={updating}
+                      />
+                      <Input 
+                        value={trackingUrl} 
+                        onChange={(e) => setTrackingUrl(e.target.value)} 
+                        placeholder="Tracking URL (optional)" 
+                        disabled={updating}
+                      />
+                      <Button
+                        onClick={handleAddTracking}
+                        disabled={updating || !carrier || !trackingNumber}
+                        className="w-full"
+                      >
+                        {updating ? 'Saving...' : order.status === 'shipped' ? 'Update Tracking Info' : 'Save & Mark Shipped'}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </Card>
+            );
+          })()}
         </div>
       </div>
     </div>

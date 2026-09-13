@@ -5,6 +5,28 @@ import Order from "@/models/Order";
 import Link from "next/link";
 import { formatPrice } from "@/lib/money";
 
+function getStatusBadgeClass(status: string) {
+  switch (status) {
+    case 'confirmed':
+    case 'delivered':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'shipped':
+    case 'out_for_delivery':
+      return 'bg-blue-100 text-blue-800';
+    case 'processing':
+    case 'packed':
+      return 'bg-purple-100 text-purple-800';
+    case 'cancelled':
+    case 'refunded':
+      return 'bg-rose-100 text-rose-800';
+    case 'return_requested':
+    case 'returned':
+    case 'pending':
+    default:
+      return 'bg-amber-100 text-amber-800';
+  }
+}
+
 export default async function OrdersPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get('auth-token')?.value;
@@ -41,8 +63,8 @@ export default async function OrdersPage() {
                 <div className="text-sm text-text-tertiary">
                   {new Date(order.createdAt).toLocaleDateString('en-IN')}
                 </div>
-                <span className="mt-1 inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-brand-100 text-brand-800">
-                  {order.status}
+                <span className={`mt-1 inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${getStatusBadgeClass(order.status)}`}>
+                  {order.status.replace(/_/g, ' ')}
                 </span>
               </div>
               <div className="text-right">

@@ -76,10 +76,10 @@ function AdminProductsContent() {
     const col = searchParams.get('collection');
     const stat = searchParams.get('status');
     const q = searchParams.get('search');
-    if (cat !== null && cat !== categoryFilter) setCategoryFilter(cat);
-    if (col !== null && col !== collectionFilter) setCollectionFilter(col);
-    if (stat !== null && stat !== statusFilter) setStatusFilter(stat);
-    if (q !== null && q !== searchTerm) setSearchTerm(q);
+    if (cat !== null) setCategoryFilter((prev) => (prev !== cat ? cat : prev));
+    if (col !== null) setCollectionFilter((prev) => (prev !== col ? col : prev));
+    if (stat !== null) setStatusFilter((prev) => (prev !== stat ? stat : prev));
+    if (q !== null) setSearchTerm((prev) => (prev !== q ? q : prev));
   }, [searchParams]);
 
   const fetchProducts = useCallback(async () => {

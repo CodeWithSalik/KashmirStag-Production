@@ -65,43 +65,50 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-text">Live Dashboard</h1>
-        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-green-100 text-green-800 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> Live MongoDB
-        </span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-text tracking-tight">Store Overview</h1>
+          <p className="text-xs sm:text-sm text-text-secondary mt-1">Real-time performance metrics and inventory status</p>
+        </div>
+        <div className="inline-flex items-center gap-2 self-start sm:self-auto px-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-secondary font-medium shadow-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span>Store Live</span>
+        </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         <StatsCard 
           title="Total Revenue" 
           value={(totalRevenue / CURRENCY_SUBUNIT).toLocaleString('en-IN', { minimumFractionDigits: 2 })} 
           prefix={CURRENCY_SYMBOL} 
-          icon={<IndianRupee />} 
+          icon={<IndianRupee className="w-5 h-5 text-brand-700" />} 
         />
         <StatsCard 
           title="Total Orders" 
           value={ordersCount} 
-          icon={<ShoppingBag />} 
+          icon={<ShoppingBag className="w-5 h-5 text-brand-700" />} 
         />
         <StatsCard 
           title="Total Customers" 
           value={customersCount} 
-          icon={<Users />} 
+          icon={<Users className="w-5 h-5 text-brand-700" />} 
         />
         <StatsCard 
           title="Pending Orders" 
           value={pendingOrdersCount} 
-          icon={<AlertCircle />} 
+          icon={<AlertCircle className="w-5 h-5 text-amber-600" />} 
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Recent Orders</h2>
-            <Link href="/admin/orders" className="text-sm text-brand-600 hover:underline">
-              View All →
+        <div className="bg-surface border border-border rounded-xl p-5 shadow-xs">
+          <div className="flex justify-between items-center mb-4 pb-3 border-b border-border">
+            <div>
+              <h2 className="text-base font-bold text-text">Recent Orders</h2>
+              <p className="text-xs text-text-secondary">Latest purchases placed on the storefront</p>
+            </div>
+            <Link href="/admin/orders" className="text-xs font-semibold text-brand-700 hover:text-brand-800 transition-colors">
+              View All &rarr;
             </Link>
           </div>
           <DataTable 
@@ -119,11 +126,14 @@ export default async function AdminDashboardPage() {
           />
         </div>
 
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Low Stock Items</h2>
-            <Link href="/admin/inventory" className="text-sm text-brand-600 hover:underline">
-              Manage Inventory →
+        <div className="bg-surface border border-border rounded-xl p-5 shadow-xs">
+          <div className="flex justify-between items-center mb-4 pb-3 border-b border-border">
+            <div>
+              <h2 className="text-base font-bold text-text">Low Stock Alert</h2>
+              <p className="text-xs text-text-secondary">Variants requiring restocking attention</p>
+            </div>
+            <Link href="/admin/inventory" className="text-xs font-semibold text-brand-700 hover:text-brand-800 transition-colors">
+              Manage Inventory &rarr;
             </Link>
           </div>
           <DataTable 

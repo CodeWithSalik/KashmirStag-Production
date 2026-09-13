@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { AlertCircle } from 'lucide-react';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -51,38 +53,62 @@ export default function ResetPasswordPage() {
   };
 
   if (!token) {
-    return <div className="text-center text-red-500">Invalid reset link. Please request a new one.</div>;
+    return (
+      <div className="text-center py-6">
+        <div className="mb-4 p-3.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-800 text-xs flex items-start gap-2.5 text-left">
+          <AlertCircle className="w-4 h-4 text-danger-600 flex-shrink-0 mt-0.5" />
+          <span>Invalid or expired password reset link. Please request a new link.</span>
+        </div>
+        <Link href="/forgot-password" className="inline-block w-full">
+          <Button variant="outline" className="w-full">
+            Request New Reset Link
+          </Button>
+        </Link>
+      </div>
+    );
   }
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-6 text-center">Set New Password</h1>
-      {error && <div className="mb-4 text-red-500 text-sm text-center">{error}</div>}
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold text-text">Set New Password</h1>
+        <p className="text-xs text-text-secondary mt-1">
+          Create a strong password of at least 8 characters.
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-5 p-3.5 rounded-lg bg-danger-50 border border-danger-200 text-danger-800 text-xs flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-danger-600 flex-shrink-0 mt-0.5" />
+          <span className="leading-relaxed">{error}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">New Password</label>
-          <Input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Confirm Password</label>
-          <Input
-            type="password"
-            required
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-        </div>
+        <Input
+          type="password"
+          label="New Password"
+          placeholder="••••••••"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Input
+          type="password"
+          label="Confirm New Password"
+          placeholder="••••••••"
+          required
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+
         <Button
           type="submit"
           disabled={loading}
-          className="w-full"
+          className="w-full mt-2"
+          size="lg"
         >
-          {loading ? 'Resetting...' : 'Reset Password'}
+          {loading ? 'Resetting Password...' : 'Reset Password'}
         </Button>
       </form>
     </div>

@@ -14,7 +14,7 @@ export const inventoryService = {
       isOutOfStock: variant.availableQty === 0
     };
   },
-  adjustStock: async (variantId: string, quantity: number, type: string, actorId?: any, note?: string) => {
+  adjustStock: async (variantId: string, quantity: number, type: string, actorId?: any, note?: string, session?: mongoose.ClientSession) => {
     const query: any = { _id: variantId };
     if (type !== 'DAMAGE' && quantity < 0) {
       query.availableQty = { $gte: Math.abs(quantity) };
@@ -22,21 +22,21 @@ export const inventoryService = {
     const updated = await ProductVariant.findOneAndUpdate(
       query,
       { $inc: { availableQty: quantity } },
-      { new: true }
+      { new: true, session }
     );
     if (!updated) {
-      const exists = await ProductVariant.findById(variantId);
+      const exists = await ProductVariant.findById(variantId).session(session || null);
       if (!exists) throw new Error('Variant not found');
       throw new Error('Insufficient stock for reduction');
     }
-    await InventoryTransaction.create({
+    await InventoryTransaction.create([{
       variantId,
       productId: updated.productId,
       type,
       quantity,
       actorId,
       note
-    });
+    }], { session });
 
     if (actorId) {
       const { auditService } = await import('./audit.service');

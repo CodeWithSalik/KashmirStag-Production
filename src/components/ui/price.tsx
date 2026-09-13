@@ -1,5 +1,6 @@
 import React from 'react';
-import { cn, formatPrice } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { formatPrice } from '@/lib/money';
 import { Badge } from './badge';
 
 export interface PriceProps extends React.HTMLAttributes<HTMLDivElement> {

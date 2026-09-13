@@ -10,8 +10,11 @@ import {
   sendCancellationNotification,
 } from '@/lib/email';
 import { AppError, NotFoundError } from '@/lib/errors';
+import { OrderStatus, isValidTransition, isCancellableStatus } from '@/config/constants';
+import { startSession } from '@/lib/db';
 
 import mongoose from 'mongoose';
+
 
 
 export async function getOrderById(orderId: string, userId?: string) {
@@ -74,16 +77,6 @@ export async function getAllOrders(params: {
   return { orders, total };
 }
 
-export const ORDER_STATE_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['processing', 'cancelled'],
-  processing: ['shipped', 'cancelled'],
-  shipped: ['delivered', 'returned'],
-  delivered: ['returned'],
-  cancelled: [],
-  returned: []
-};
-
 /**
  * Atomically marks an event as notified on the Order and dispatches the email.
  * Prevents race conditions and duplicate emails between webhooks and client redirects.
@@ -134,91 +127,205 @@ function toObjectId(id?: string): mongoose.Types.ObjectId | undefined {
   return undefined;
 }
 
-export async function updateOrderStatus(orderId: string, newStatus: any, actorId?: string, comment?: string) {
+export async function updateOrderStatus(
+  orderId: string,
+  newStatus: OrderStatus,
+  actorId?: string,
+  comment?: string,
+  expectedCurrentStatus?: OrderStatus
+) {
   const isObjectId = mongoose.Types.ObjectId.isValid(orderId) && /^[0-9a-fA-F]{24}$/.test(orderId);
   const order = await Order.findOne({
     $or: [{ orderId }, ...(isObjectId ? [{ _id: orderId }] : [])],
   });
   if (!order) throw new NotFoundError('Order');
 
+  // Idempotency: already at target status
   if (order.status === newStatus) return order;
 
-  if (newStatus === 'cancelled') {
-    return cancelOrder(order.orderId, comment || 'Cancelled by admin', actorId);
+  // Optimistic concurrency check if expectedCurrentStatus provided
+  if (expectedCurrentStatus && order.status !== expectedCurrentStatus) {
+    throw new AppError(
+      `Order status conflict: expected '${expectedCurrentStatus}' but order is currently '${order.status}'. Please refresh.`,
+      409
+    );
   }
 
-  const allowedTransitions = ORDER_STATE_TRANSITIONS[order.status] || [];
-  if (!allowedTransitions.includes(newStatus)) {
-    throw new AppError(`Cannot transition order status from '${order.status}' to '${newStatus}'`, 400);
+  // Routing cancellation through cancelOrder for proper inventory release/restock
+  if (newStatus === 'cancelled') {
+    return cancelOrder(order.orderId, comment || 'Cancelled by admin', actorId, expectedCurrentStatus);
+  }
+
+  // State machine transition validation
+  if (!isValidTransition(order.status, newStatus, order.paymentStatus)) {
+    throw new AppError(
+      `Cannot transition order status from '${order.status}' to '${newStatus}'`,
+      400
+    );
+  }
+
+  // Specific prerequisite validations
+  if (newStatus === 'refunded') {
+    if (order.paymentStatus !== 'paid' && order.paymentStatus !== 'partially_refunded') {
+      throw new AppError(
+        `Cannot mark order as refunded because payment status is '${order.paymentStatus}'`,
+        400
+      );
+    }
   }
 
   const oldStatus = order.status;
-  order.status = newStatus;
-  order.timeline.push({ status: newStatus, comment, actorId: toObjectId(actorId), createdAt: new Date() });
-  await order.save();
+  const updatePayload: any = {
+    $set: {
+      status: newStatus,
+      ...(newStatus === 'refunded' ? { paymentStatus: 'refunded' } : {}),
+      ...(newStatus === 'delivered' ? { 'fulfillment.deliveredAt': new Date() } : {}),
+    },
+    $push: {
+      timeline: {
+        status: newStatus,
+        comment,
+        actorId: toObjectId(actorId),
+        createdAt: new Date(),
+      },
+    },
+  };
+
+  // Atomic conditional update to prevent concurrent race conditions
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: order._id, status: oldStatus },
+    updatePayload,
+    { new: true }
+  );
+
+  if (!updatedOrder) {
+    const current = await Order.findById(order._id);
+    if (current?.status === newStatus) return current; // Concurrent request already transitioned
+    throw new AppError(
+      `Concurrent status update detected. Order is no longer in '${oldStatus}' status.`,
+      409
+    );
+  }
 
   if (actorId) {
     const { auditService } = await import('./audit.service');
-    await auditService.log(actorId, 'UPDATE_ORDER_STATUS', 'Order', order._id || order.orderId, {
+    await auditService.log(actorId, 'UPDATE_ORDER_STATUS', 'Order', updatedOrder._id?.toString() || updatedOrder.orderId, {
       from: oldStatus,
       to: newStatus,
       comment,
-      orderId: order.orderId,
+      orderId: updatedOrder.orderId,
     });
   }
 
-  // Transactional Email Triggers
+  // Transactional Notifications
   if (newStatus === 'processing') {
-    await recordAndSendOrderNotification(order, 'processing', () =>
-      sendOrderStatusUpdate(order.email, order, 'processing', comment)
+    await recordAndSendOrderNotification(updatedOrder, 'processing', () =>
+      sendOrderStatusUpdate(updatedOrder.email, updatedOrder, 'processing', comment)
     );
   } else if (newStatus === 'shipped') {
-    await recordAndSendOrderNotification(order, 'shipped', () =>
-      sendShippingNotification(order.email, order, {
-        carrier: order.fulfillment?.carrier,
-        trackingNumber: order.fulfillment?.trackingNumber,
-        trackingUrl: order.fulfillment?.trackingUrl,
+    await recordAndSendOrderNotification(updatedOrder, 'shipped', () =>
+      sendShippingNotification(updatedOrder.email, updatedOrder, {
+        carrier: updatedOrder.fulfillment?.carrier,
+        trackingNumber: updatedOrder.fulfillment?.trackingNumber,
+        trackingUrl: updatedOrder.fulfillment?.trackingUrl,
       })
     );
   } else if (newStatus === 'delivered') {
-    await recordAndSendOrderNotification(order, 'delivered', () =>
-      sendDeliveryNotification(order.email, order)
+    await recordAndSendOrderNotification(updatedOrder, 'delivered', () =>
+      sendDeliveryNotification(updatedOrder.email, updatedOrder)
+    );
+  } else if (newStatus === 'returned') {
+    await recordAndSendOrderNotification(updatedOrder, 'returned', () =>
+      sendOrderStatusUpdate(updatedOrder.email, updatedOrder, 'returned', comment || 'Order return completed')
+    );
+  } else if (newStatus === 'refunded') {
+    await recordAndSendOrderNotification(updatedOrder, 'refunded', () =>
+      sendOrderStatusUpdate(updatedOrder.email, updatedOrder, 'refunded', comment || 'Refund processed')
     );
   }
 
-  return order;
+  return updatedOrder;
 }
 
-export async function addTrackingInfo(orderId: string, carrier: string, trackingNumber: string, trackingUrl?: string, actorId?: string) {
+export async function addTrackingInfo(
+  orderId: string,
+  carrier: string,
+  trackingNumber: string,
+  trackingUrl?: string,
+  actorId?: string
+) {
   const isObjectId = mongoose.Types.ObjectId.isValid(orderId) && /^[0-9a-fA-F]{24}$/.test(orderId);
   const order = await Order.findOne({
     $or: [{ orderId }, ...(isObjectId ? [{ _id: orderId }] : [])],
   });
   if (!order) throw new NotFoundError('Order');
 
-  order.fulfillment = { carrier, trackingNumber, trackingUrl, shippedAt: new Date() };
-  order.timeline.push({ status: 'shipped', comment: 'Tracking info added', actorId: toObjectId(actorId), createdAt: new Date() });
-  order.status = 'shipped';
+  // Can only add tracking info if order is packed, processing, or already shipped
+  if (!['packed', 'processing', 'shipped'].includes(order.status)) {
+    throw new AppError(
+      `Cannot add tracking info or mark shipped when order is in '${order.status}' status`,
+      400
+    );
+  }
 
-  await order.save();
+  const oldStatus = order.status;
+  const isAlreadyShipped = oldStatus === 'shipped';
+
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: order._id, status: oldStatus },
+    {
+      $set: {
+        status: 'shipped',
+        fulfillment: {
+          carrier,
+          trackingNumber,
+          trackingUrl,
+          shippedAt: order.fulfillment?.shippedAt || new Date(),
+        },
+      },
+      $push: {
+        timeline: {
+          status: 'shipped',
+          comment: isAlreadyShipped
+            ? `Tracking updated: ${carrier} (${trackingNumber})`
+            : `Fulfillment dispatched via ${carrier} (${trackingNumber})`,
+          actorId: toObjectId(actorId),
+          createdAt: new Date(),
+        },
+      },
+    },
+    { new: true }
+  );
+
+  if (!updatedOrder) {
+    throw new AppError(
+      `Concurrent update detected. Order is no longer in '${oldStatus}' status.`,
+      409
+    );
+  }
 
   if (actorId) {
     const { auditService } = await import('./audit.service');
-    await auditService.log(actorId, 'ADD_TRACKING', 'Order', order._id || order.orderId, {
+    await auditService.log(actorId, 'ADD_TRACKING', 'Order', updatedOrder._id?.toString() || updatedOrder.orderId, {
       carrier,
       trackingNumber,
-      orderId: order.orderId,
+      orderId: updatedOrder.orderId,
     });
   }
 
-  await recordAndSendOrderNotification(order, 'shipped', () =>
-    sendShippingNotification(order.email, order, { carrier, trackingNumber, trackingUrl })
+  await recordAndSendOrderNotification(updatedOrder, 'shipped', () =>
+    sendShippingNotification(updatedOrder.email, updatedOrder, { carrier, trackingNumber, trackingUrl })
   );
 
-  return order;
+  return updatedOrder;
 }
 
-export async function cancelOrder(orderId: string, reason: string, actorId?: string) {
+export async function cancelOrder(
+  orderId: string,
+  reason: string,
+  actorId?: string,
+  expectedCurrentStatus?: OrderStatus
+) {
   const isObjectId = mongoose.Types.ObjectId.isValid(orderId) && /^[0-9a-fA-F]{24}$/.test(orderId);
   const order = await Order.findOne({
     $or: [{ orderId }, ...(isObjectId ? [{ _id: orderId }] : [])],
@@ -226,50 +333,144 @@ export async function cancelOrder(orderId: string, reason: string, actorId?: str
   if (!order) throw new NotFoundError('Order');
 
   if (order.status === 'cancelled') {
-    return order; // Already cancelled
+    return order; // Already cancelled idempotently
   }
 
-  if (order.status !== 'pending' && order.status !== 'confirmed' && order.status !== 'processing') {
+  if (expectedCurrentStatus && order.status !== expectedCurrentStatus) {
+    throw new AppError(
+      `Order status conflict: expected '${expectedCurrentStatus}' but order is currently '${order.status}'. Please refresh.`,
+      409
+    );
+  }
+
+  if (!isCancellableStatus(order.status)) {
     throw new AppError(`Order cannot be cancelled in '${order.status}' status`, 400);
   }
 
-  const items = order.items.map(item => ({ variantId: item.variantId.toString(), quantity: item.quantity }));
-  
-  if (order.paymentStatus === 'paid' || order.status === 'confirmed' || order.status === 'processing') {
-    // Inventory was already committed (sale finalized). Restock available stock.
-    for (const item of items) {
-      await inventoryService.adjustStock(
-        item.variantId,
-        item.quantity,
-        'RESTOCK',
-        actorId,
-        `Restocked from cancelled order ${order.orderId}`
-      );
-    }
-  } else {
-    // Inventory was only reserved. Release reservation back to available stock.
-    await inventoryService.releaseReservation(items, order.orderId);
-  }
+  const oldStatus = order.status;
+  const updatePayload: any = {
+    $set: {
+      status: 'cancelled',
+      cancellation: { reason, requestedAt: new Date() },
+    },
+    $push: {
+      timeline: {
+        status: 'cancelled',
+        comment: reason,
+        actorId: toObjectId(actorId),
+        createdAt: new Date(),
+      },
+    },
+  };
 
-  order.status = 'cancelled';
-  order.cancellation = { reason, requestedAt: new Date() };
-  order.timeline.push({ status: 'cancelled', comment: reason, actorId: toObjectId(actorId), createdAt: new Date() });
-  await order.save();
+  let updatedOrder: any = null;
+  const session = await startSession();
+  let usedSession = false;
+
+  try {
+    await session.withTransaction(async () => {
+      usedSession = true;
+      updatedOrder = await Order.findOneAndUpdate(
+        { _id: order._id, status: oldStatus },
+        updatePayload,
+        { new: true, session }
+      );
+
+      if (!updatedOrder) {
+        const current = await Order.findById(order._id).session(session);
+        if (current?.status === 'cancelled') {
+          updatedOrder = current;
+          return;
+        }
+        throw new AppError(
+          `Concurrent status update detected. Order is no longer in '${oldStatus}' status.`,
+          409
+        );
+      }
+
+      const items = updatedOrder.items.map((item: any) => ({
+        variantId: item.variantId.toString(),
+        quantity: item.quantity,
+      }));
+
+      if (oldStatus === 'pending') {
+        try {
+          await inventoryService.releaseReservation(items, updatedOrder.orderId, session);
+        } catch (err: any) {
+          console.warn(`[Order:Cancel] Reservation release for ${updatedOrder.orderId}:`, err?.message || err);
+        }
+      } else {
+        for (const item of items) {
+          await inventoryService.adjustStock(
+            item.variantId,
+            item.quantity,
+            'RESTOCK',
+            actorId,
+            `Restocked from cancelled order ${updatedOrder.orderId}`,
+            session
+          );
+        }
+      }
+    });
+  } catch (err: any) {
+    if (!usedSession && (err?.message?.includes('Transaction numbers are only allowed') || err?.message?.includes('replica set'))) {
+      updatedOrder = await Order.findOneAndUpdate(
+        { _id: order._id, status: oldStatus },
+        updatePayload,
+        { new: true }
+      );
+
+      if (!updatedOrder) {
+        const current = await Order.findById(order._id);
+        if (current?.status === 'cancelled') return current;
+        throw new AppError(
+          `Concurrent status update detected. Order is no longer in '${oldStatus}' status.`,
+          409
+        );
+      }
+
+      const items = updatedOrder.items.map((item: any) => ({
+        variantId: item.variantId.toString(),
+        quantity: item.quantity,
+      }));
+
+      if (oldStatus === 'pending') {
+        try {
+          await inventoryService.releaseReservation(items, updatedOrder.orderId);
+        } catch (err: any) {
+          console.warn(`[Order:Cancel] Reservation release for ${updatedOrder.orderId}:`, err?.message || err);
+        }
+      } else {
+        for (const item of items) {
+          await inventoryService.adjustStock(
+            item.variantId,
+            item.quantity,
+            'RESTOCK',
+            actorId,
+            `Restocked from cancelled order ${updatedOrder.orderId}`
+          );
+        }
+      }
+    } else {
+      throw err;
+    }
+  } finally {
+    await session.endSession();
+  }
 
   if (actorId) {
     const { auditService } = await import('./audit.service');
-    await auditService.log(actorId, 'CANCEL_ORDER', 'Order', order._id || order.orderId, {
+    await auditService.log(actorId, 'CANCEL_ORDER', 'Order', updatedOrder._id?.toString() || updatedOrder.orderId, {
       reason,
-      orderId: order.orderId,
+      orderId: updatedOrder.orderId,
     });
   }
 
-
-  await recordAndSendOrderNotification(order, 'cancelled', () =>
-    sendCancellationNotification(order.email, order, reason, order.cancellation?.refundAmount)
+  await recordAndSendOrderNotification(updatedOrder, 'cancelled', () =>
+    sendCancellationNotification(updatedOrder.email, updatedOrder, reason, updatedOrder.cancellation?.refundAmount)
   );
 
-  return order;
+  return updatedOrder;
 }
 
 export async function confirmPayment(gatewayOrderId: string, paymentId: string) {
@@ -292,27 +493,77 @@ export async function confirmPayment(gatewayOrderId: string, paymentId: string) 
   if (!order) throw new NotFoundError('Order');
 
   if (order.paymentStatus !== 'paid') {
-    order.paymentStatus = 'paid';
-    order.status = 'confirmed';
-    order.timeline.push({ status: 'confirmed', comment: 'Payment confirmed', createdAt: new Date() });
-    await order.save();
+    let updatedOrder: any = null;
+    const session = await startSession();
+    let usedSession = false;
 
-    const itemsToCommit = order.items.map(item => ({ variantId: item.variantId.toString(), quantity: item.quantity }));
-    await inventoryService.commitReservation(itemsToCommit, order.orderId);
+    try {
+      await session.withTransaction(async () => {
+        usedSession = true;
+        updatedOrder = await Order.findOneAndUpdate(
+          { _id: order._id, paymentStatus: { $ne: 'paid' } },
+          {
+            $set: { paymentStatus: 'paid', status: 'confirmed' },
+            $push: {
+              timeline: { status: 'confirmed', comment: 'Payment confirmed', createdAt: new Date() },
+            },
+          },
+          { new: true, session }
+        );
 
-    // Atomically dispatch order confirmation email
-    await recordAndSendOrderNotification(order, 'confirmed', () =>
-      sendOrderConfirmation(order.email, {
-        orderId: order.orderId,
-        items: order.items,
-        pricing: order.pricing,
-        total: order.pricing?.total,
-        shippingAddress: order.shippingAddress,
-        createdAt: order.createdAt,
-      })
-    );
+        if (!updatedOrder) {
+          return; // Handled concurrently
+        }
+
+        const itemsToCommit = updatedOrder.items.map((item: any) => ({
+          variantId: item.variantId.toString(),
+          quantity: item.quantity,
+        }));
+        await inventoryService.commitReservation(itemsToCommit, updatedOrder.orderId, session);
+      });
+    } catch (err: any) {
+      if (!usedSession && (err?.message?.includes('Transaction numbers are only allowed') || err?.message?.includes('replica set'))) {
+        updatedOrder = await Order.findOneAndUpdate(
+          { _id: order._id, paymentStatus: { $ne: 'paid' } },
+          {
+            $set: { paymentStatus: 'paid', status: 'confirmed' },
+            $push: {
+              timeline: { status: 'confirmed', comment: 'Payment confirmed', createdAt: new Date() },
+            },
+          },
+          { new: true }
+        );
+
+        if (updatedOrder) {
+          const itemsToCommit = updatedOrder.items.map((item: any) => ({
+            variantId: item.variantId.toString(),
+            quantity: item.quantity,
+          }));
+          await inventoryService.commitReservation(itemsToCommit, updatedOrder.orderId);
+        }
+      } else {
+        throw err;
+      }
+    } finally {
+      await session.endSession();
+    }
+
+    if (updatedOrder) {
+      // Atomically dispatch order confirmation email
+      await recordAndSendOrderNotification(updatedOrder, 'confirmed', () =>
+        sendOrderConfirmation(updatedOrder.email, {
+          orderId: updatedOrder.orderId,
+          items: updatedOrder.items,
+          pricing: updatedOrder.pricing,
+          total: updatedOrder.pricing?.total,
+          shippingAddress: updatedOrder.shippingAddress,
+          createdAt: updatedOrder.createdAt,
+        })
+      );
+    }
   }
 }
+
 
 
 export async function cleanupExpiredReservations(expiryMinutes = 30) {

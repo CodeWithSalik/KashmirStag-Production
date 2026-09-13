@@ -17,14 +17,14 @@ export default function TermsPage() {
         <section className="mt-8">
           <h2 className="text-2xl font-bold text-text mb-4">1. Agreement to Terms</h2>
           <p>
-            These Terms and Conditions constitute a legally binding agreement made between you, whether personally or on behalf of an entity ("you") and {APP_NAME} ("we," "us" or "our"), concerning your access to and use of the {APP_NAME}.com website as well as any other media form, media channel, mobile website or mobile application related, linked, or otherwise connected thereto.
+            These Terms and Conditions constitute a legally binding agreement made between you, whether personally or on behalf of an entity (&quot;you&quot;) and {APP_NAME} (&quot;we,&quot; &quot;us&quot; or &quot;our&quot;), concerning your access to and use of the {APP_NAME}.com website as well as any other media form, media channel, mobile website or mobile application related, linked, or otherwise connected thereto.
           </p>
         </section>
 
         <section className="mt-8">
           <h2 className="text-2xl font-bold text-text mb-4">2. Intellectual Property Rights</h2>
           <p>
-            Unless otherwise indicated, the Site is our proprietary property and all source code, databases, functionality, software, website designs, audio, video, text, photographs, and graphics on the Site (collectively, the "Content") and the trademarks, service marks, and logos contained therein (the "Marks") are owned or controlled by us or licensed to us.
+            Unless otherwise indicated, the Site is our proprietary property and all source code, databases, functionality, software, website designs, audio, video, text, photographs, and graphics on the Site (collectively, the &quot;Content&quot;) and the trademarks, service marks, and logos contained therein (the &quot;Marks&quot;) are owned or controlled by us or licensed to us.
           </p>
         </section>
 

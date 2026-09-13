@@ -46,39 +46,43 @@ export function FilterSidebar({ categories }: FilterSidebarProps) {
       </div>
 
       <div className={`space-y-6 ${isOpen ? "block" : "hidden"} lg:block`}>
-        <div className="flex justify-between items-center">
-          <h3 className="font-medium text-lg">Filters</h3>
-          <button onClick={clearFilters} className="text-sm text-brand-600 hover:underline">Clear All</button>
+        <div className="flex justify-between items-center pb-2 border-b border-border">
+          <h3 className="font-semibold text-base text-text">Filters</h3>
+          <button onClick={clearFilters} className="text-xs font-medium text-brand-700 hover:text-brand-800 transition-colors">Clear All</button>
         </div>
 
         <div className="space-y-3">
-          <h4 className="font-medium text-sm text-text-primary">Categories</h4>
+          <h4 className="font-medium text-sm text-text">Categories</h4>
           <div className="space-y-2">
             {categories.map((cat) => (
-              <label key={cat.id} className="flex items-center gap-2 cursor-pointer">
+              <label key={cat.id} className="flex items-center gap-2.5 cursor-pointer group">
                 <input
                   type="radio"
                   name="category"
                   checked={currentCategory === cat.slug}
                   onChange={() => toggleFilter("category", cat.slug)}
-                  className="rounded-full text-brand-600 focus:ring-brand-500"
+                  className="rounded-full text-brand-700 focus:ring-brand-700 accent-brand-700"
                 />
-                <span className="text-sm text-text-secondary">{cat.name}</span>
+                <span className={`text-sm transition-colors ${currentCategory === cat.slug ? 'font-medium text-text' : 'text-text-secondary group-hover:text-text'}`}>
+                  {cat.name}
+                </span>
               </label>
             ))}
           </div>
         </div>
 
-        <div className="space-y-3 border-t border-surface-200 pt-4">
-          <h4 className="font-medium text-sm text-text-primary">Availability</h4>
-          <label className="flex items-center gap-2 cursor-pointer">
+        <div className="space-y-3 border-t border-border pt-4">
+          <h4 className="font-medium text-sm text-text">Availability</h4>
+          <label className="flex items-center gap-2.5 cursor-pointer group">
             <input
               type="checkbox"
               checked={inStock}
               onChange={(e) => toggleFilter("inStock", e.target.checked ? "true" : null)}
-              className="rounded text-brand-600 focus:ring-brand-500"
+              className="rounded text-brand-700 focus:ring-brand-700 accent-brand-700"
             />
-            <span className="text-sm text-text-secondary">In Stock Only</span>
+            <span className={`text-sm transition-colors ${inStock ? 'font-medium text-text' : 'text-text-secondary group-hover:text-text'}`}>
+              In Stock Only
+            </span>
           </label>
         </div>
       </div>

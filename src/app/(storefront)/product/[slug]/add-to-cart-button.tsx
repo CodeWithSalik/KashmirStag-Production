@@ -6,6 +6,7 @@ import { useToast } from "@/providers/toast-provider";
 import { VariantSelector } from "@/components/product/variant-selector";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Minus, Plus, ShoppingBag, ArrowRight } from "lucide-react";
 
 export function AddToCartButton({ product, variants }: { product: any, variants: any[] }) {
   const { addItem } = useCart();
@@ -29,7 +30,7 @@ export function AddToCartButton({ product, variants }: { product: any, variants:
       );
       setAdded(true);
       toast('Item added to your cart!', 'success');
-      setTimeout(() => setAdded(false), 3000);
+      setTimeout(() => setAdded(false), 4000);
     } catch (err: any) {
       toast(err.message || 'Failed to add item to cart', 'error');
     } finally {
@@ -50,44 +51,46 @@ export function AddToCartButton({ product, variants }: { product: any, variants:
         />
       )}
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-        <div className="flex items-center justify-between sm:justify-start border border-border rounded-md w-32">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
+        <div className="flex items-center rounded-lg border border-border bg-surface-secondary/50 p-1 w-full sm:w-36 justify-between shadow-xs">
           <button
             onClick={() => setQuantity(Math.max(1, quantity - 1))}
-            className="px-3 py-2 text-text-secondary hover:text-brand-600 disabled:opacity-30"
+            className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:text-text hover:bg-surface transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
             disabled={quantity <= 1 || isOutOfStock}
             type="button"
             aria-label="Decrease quantity"
           >
-            -
+            <Minus className="w-3.5 h-3.5" />
           </button>
-          <span className="w-8 text-center text-sm font-medium">{quantity}</span>
+          <span className="text-sm font-semibold text-text select-none">{quantity}</span>
           <button
             onClick={() => setQuantity(Math.min(maxQty, quantity + 1))}
-            className="px-3 py-2 text-text-secondary hover:text-brand-600 disabled:opacity-30"
+            className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:text-text hover:bg-surface transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
             disabled={quantity >= maxQty || isOutOfStock}
             type="button"
             aria-label="Increase quantity"
           >
-            +
+            <Plus className="w-3.5 h-3.5" />
           </button>
         </div>
         
         <Button
           onClick={handleAdd}
           disabled={isOutOfStock || adding}
-          className="flex-1"
+          className="flex-1 flex items-center justify-center gap-2"
           size="lg"
         >
-          {adding ? "Adding..." : isOutOfStock ? "Out of Stock" : added ? "Added to Cart ✓" : "Add to Cart"}
+          <ShoppingBag className="w-4 h-4" />
+          <span>{adding ? "Adding to Bag..." : isOutOfStock ? "Out of Stock" : added ? "Added to Bag ✓" : "Add to Bag"}</span>
         </Button>
 
         {added && (
           <Link
             href="/cart"
-            className="inline-flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-md border border-brand-600 text-brand-700 bg-brand-50 hover:bg-brand-100 transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-3 text-sm font-semibold rounded-lg border border-brand-700 text-brand-800 bg-brand-50 hover:bg-brand-100 transition-colors shadow-xs"
           >
-            View Cart &rarr;
+            <span>View Bag</span>
+            <ArrowRight className="w-4 h-4" />
           </Link>
         )}
       </div>

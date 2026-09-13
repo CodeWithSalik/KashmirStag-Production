@@ -29,7 +29,9 @@ export const checkoutSchema = z.object({
 export const updateOrderStatusSchema = z.object({
   status: z.enum(ORDER_STATUSES),
   comment: z.string().max(500).optional(),
+  expectedCurrentStatus: z.enum(ORDER_STATUSES).optional(),
 });
+
 
 export const addTrackingSchema = z.object({
   carrier: z.string().min(1),

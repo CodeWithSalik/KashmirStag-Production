@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
+import { ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProductGalleryProps {
@@ -19,13 +20,9 @@ export function ProductGallery({ images, title }: ProductGalleryProps) {
 
   if (!images?.length) {
     return (
-      <div className="relative aspect-square w-full rounded-lg bg-surface-secondary border border-border flex flex-col items-center justify-center text-text-tertiary">
-        <svg className="w-16 h-16 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <rect width="18" height="18" x="3" y="3" rx="2" strokeWidth="1.5" />
-          <circle cx="9" cy="9" r="2" strokeWidth="1.5" />
-          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" strokeWidth="1.5" />
-        </svg>
-        <span className="text-sm font-medium">No Image Available</span>
+      <div className="relative aspect-square w-full rounded-2xl bg-surface-secondary border border-border flex flex-col items-center justify-center text-text-tertiary">
+        <ImageOff className="w-10 h-10 mb-2 opacity-40 text-text-tertiary" strokeWidth={1.5} />
+        <span className="text-xs font-medium">No Image Available</span>
       </div>
     );
   }
@@ -33,14 +30,14 @@ export function ProductGallery({ images, title }: ProductGalleryProps) {
   return (
     <div className="flex flex-col md:flex-row-reverse gap-4">
       {/* Main Image */}
-      <div className="relative aspect-square w-full flex-1 overflow-hidden rounded-lg bg-surface-100 group">
+      <div className="relative aspect-square w-full flex-1 overflow-hidden rounded-2xl bg-surface-secondary border border-border group shadow-xs">
         <Image
           src={getImageSrc(currentIndex)}
           alt={`${title} - Image ${currentIndex + 1}`}
           fill
           priority
           sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-110"
+          className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
           onError={() => setErrorMap((prev) => ({ ...prev, [currentIndex]: true }))}
         />
       </div>

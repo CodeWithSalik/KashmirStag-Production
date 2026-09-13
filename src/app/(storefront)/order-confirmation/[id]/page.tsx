@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { connectDB } from '@/lib/db';
 import Order from '@/models/Order';
 import Link from 'next/link';
+import Image from 'next/image';
 import { formatPrice } from '@/lib/money';
 import { CheckCircle2, ShoppingBag, ArrowRight } from 'lucide-react';
 import mongoose from 'mongoose';
@@ -70,9 +71,11 @@ export default async function OrderConfirmationPage({ params }: { params: Promis
               <div key={idx} className="py-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   {item.image && (
-                    <img
+                    <Image
                       src={item.image}
                       alt={item.title}
+                      width={48}
+                      height={48}
                       className="w-12 h-12 rounded object-cover border border-border shrink-0"
                     />
                   )}

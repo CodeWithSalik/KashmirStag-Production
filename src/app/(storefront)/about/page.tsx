@@ -19,9 +19,19 @@ export default function AboutPage() {
           Bringing the authentic quality and rich heritage of Kashmir to your doorstep through premium fashion and lifestyle products.
         </p>
 
-        <div className="my-12 w-full h-[400px] bg-surface-secondary rounded-xl flex items-center justify-center border border-border">
-          {/* Placeholder for a beautiful Kashmir landscape or workshop image */}
-          <span className="text-text-tertiary">Our Heritage</span>
+        <div className="my-12 p-8 sm:p-12 rounded-2xl bg-brand-950 text-white relative overflow-hidden border border-brand-900 shadow-card">
+          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#ca8a04_1px,transparent_1px)] [background-size:20px_20px]" />
+          <div className="relative z-10 max-w-2xl mx-auto text-center space-y-4">
+            <span className="inline-block text-[11px] font-semibold uppercase tracking-widest text-brand-400 bg-brand-900/60 px-3 py-1 rounded-full border border-brand-700/50">
+              Centuries of Artisanship
+            </span>
+            <blockquote className="font-serif text-2xl sm:text-3xl italic text-gray-100 leading-relaxed">
+              &ldquo;True elegance is never hurried. It is woven thread by thread, refined stitch by stitch, and passed through generations in the valley of Kashmir.&rdquo;
+            </blockquote>
+            <p className="text-xs text-brand-300 font-medium tracking-wide uppercase">
+              — Master Artisans of Srinagar
+            </p>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-12 mt-12">
@@ -38,10 +48,10 @@ export default function AboutPage() {
           <div>
             <h2 className="text-2xl font-bold text-brand-800 mb-4">Our Mission</h2>
             <p className="mb-4">
-              Our mission is to provide premium fashion that doesn't just look good, but feels authentic. We aim to build a brand that stands for uncompromising quality, sustainable practices, and a deep respect for the origins of our materials and inspirations.
+              Our mission is to provide premium fashion that doesn&apos;t just look good, but feels authentic. We aim to build a brand that stands for uncompromising quality, sustainable practices, and a deep respect for the origins of our materials and inspirations.
             </p>
             <p>
-              We strive to create a seamless shopping experience, bringing the essence of Kashmir's elegance directly to your wardrobe.
+              We strive to create a seamless shopping experience, bringing the essence of Kashmir&apos;s elegance directly to your wardrobe.
             </p>
           </div>
         </div>

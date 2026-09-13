@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 export function SearchBar() {
@@ -67,21 +68,19 @@ export function SearchBar() {
             role="combobox"
             aria-controls="search-suggestions"
           />
-          <svg className="absolute left-3 top-2.5 h-5 w-5 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Search className="absolute left-3 top-3 h-4 w-4 text-text-tertiary pointer-events-none" strokeWidth={1.75} />
         </div>
       </form>
 
       {isOpen && suggestions.length > 0 && (
-        <div id="search-suggestions" className="absolute top-full mt-1 w-full bg-white rounded-md shadow-lg border border-surface-200 z-50 overflow-hidden">
-          <ul className="py-1">
+        <div id="search-suggestions" className="absolute top-full mt-1.5 w-full bg-surface rounded-lg shadow-elevated border border-border z-50 overflow-hidden">
+          <ul className="py-1 divide-y divide-border/40">
             {suggestions.map((p) => (
               <li key={p._id}>
                 <Link
                   href={`/product/${p.slug}`}
                   onClick={() => { setIsOpen(false); setQuery(""); }}
-                  className="block px-4 py-2 text-sm text-text-primary hover:bg-surface-50 hover:text-brand-600"
+                  className="block px-4 py-2.5 text-sm text-text hover:bg-surface-secondary hover:text-brand-700 transition-colors"
                 >
                   {p.title}
                 </Link>

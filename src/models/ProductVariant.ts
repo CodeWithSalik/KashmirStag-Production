@@ -31,7 +31,7 @@ const productVariantSchema = new Schema<IProductVariant>(
     compareAtPrice: { type: Number },
     costPrice: { type: Number },
     availableQty: { type: Number, min: 0, default: 0 },
-    reservedQty: { type: Number, default: 0 },
+    reservedQty: { type: Number, min: 0, default: 0 },
     lowStockThreshold: { type: Number, default: 5 },
     image: { type: String },
     isActive: { type: Boolean, default: true },

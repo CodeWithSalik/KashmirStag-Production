@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
+import { Sparkles, Truck, ShieldCheck, RotateCcw } from 'lucide-react';
 import { connectDB } from '@/lib/db';
 import Category from '@/models/Category';
 import Product from '@/models/Product';
@@ -114,20 +116,22 @@ export default async function HomePage() {
       </section>
 
       {/* Value Props */}
-      <section className="border-b border-border bg-surface-secondary py-10" aria-label="Store Benefits">
+      <section className="border-b border-border bg-surface-secondary/60 py-10" aria-label="Store Benefits">
         <h2 className="sr-only">Why Choose KashmirStag</h2>
         <div className="container-page">
-          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-4">
             {[
-              { icon: '🏔️', title: 'Authentic Kashmir Craft', desc: 'Directly sourced from master artisans' },
-              { icon: '🚚', title: 'Free Express Shipping', desc: 'On all orders above ₹999' },
-              { icon: '🔒', title: 'Secure Checkout', desc: 'Protected by Razorpay 256-bit encryption' },
-              { icon: '↩️', title: '7-Day Easy Returns', desc: 'No-hassle returns and exchanges' },
+              { icon: <Sparkles className="w-5 h-5 text-brand-700" strokeWidth={1.75} />, title: 'Authentic Kashmir Craft', desc: 'Directly sourced from master artisans' },
+              { icon: <Truck className="w-5 h-5 text-brand-700" strokeWidth={1.75} />, title: 'Free Express Shipping', desc: 'On all orders above ₹999' },
+              { icon: <ShieldCheck className="w-5 h-5 text-brand-700" strokeWidth={1.75} />, title: 'Secure Checkout', desc: 'Verified and protected by Razorpay' },
+              { icon: <RotateCcw className="w-5 h-5 text-brand-700" strokeWidth={1.75} />, title: '7-Day Easy Returns', desc: 'No-hassle returns and exchanges' },
             ].map((item) => (
-              <div key={item.title} className="text-center p-3">
-                <div className="text-3xl mb-2">{item.icon}</div>
+              <div key={item.title} className="flex flex-col items-center text-center p-4 rounded-xl bg-surface border border-border shadow-xs">
+                <div className="w-10 h-10 rounded-full bg-brand-50 border border-brand-200/70 flex items-center justify-center mb-3">
+                  {item.icon}
+                </div>
                 <h3 className="text-sm font-semibold text-text">{item.title}</h3>
-                <p className="mt-1 text-xs text-text-secondary">{item.desc}</p>
+                <p className="mt-1 text-xs text-text-secondary leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -135,28 +139,28 @@ export default async function HomePage() {
       </section>
 
       {/* Promo Banner */}
-      <section className="bg-brand-50 border-b border-brand-100 py-3">
-        <div className="container-page flex items-center justify-center gap-3 text-center text-sm">
-          <span className="font-semibold text-brand-800">Special Welcome Offer:</span>
-          <span className="text-brand-700">
-            Use code <span className="font-mono font-bold bg-brand-200/80 px-2 py-0.5 rounded text-brand-900">WELCOME10</span> for 10% off your first order!
+      <section className="bg-brand-50/70 border-b border-brand-100 py-2.5">
+        <div className="container-page flex items-center justify-center gap-2.5 text-center text-xs sm:text-sm">
+          <span className="font-semibold text-brand-900">Welcome Offer:</span>
+          <span className="text-brand-800">
+            Use code <span className="font-mono font-bold bg-brand-200/80 px-2 py-0.5 rounded text-brand-950">WELCOME10</span> for 10% off your first order
           </span>
         </div>
       </section>
 
       {/* Featured Categories */}
-      <section className="py-16 md:py-24">
+      <section className="py-16 md:py-20">
         <div className="container-page">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8">
             <div>
               <h2 className="text-2xl font-bold md:text-3xl text-text">Shop by Category</h2>
-              <p className="mt-2 text-text-secondary">
+              <p className="mt-1.5 text-sm text-text-secondary">
                 Curated collections handcrafted with care and heritage
               </p>
             </div>
             <Link
               href="/categories"
-              className="mt-4 sm:mt-0 text-sm font-semibold text-brand-700 hover:text-brand-800 transition-colors"
+              className="mt-3 sm:mt-0 text-sm font-medium text-brand-700 hover:text-brand-800 transition-colors"
             >
               View All Categories &rarr;
             </Link>
@@ -167,20 +171,31 @@ export default async function HomePage() {
               <Link
                 key={cat.slug}
                 href={`/category/${cat.slug}`}
-                className="group relative flex flex-col justify-end h-72 overflow-hidden rounded-xl bg-surface-tertiary p-6 border border-border transition-all duration-300 hover:shadow-elevated hover:border-brand-500"
+                className="group relative flex flex-col justify-end h-72 overflow-hidden rounded-xl bg-surface-secondary border border-border transition-all duration-300 hover:shadow-elevated hover:border-brand-600"
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent z-10" />
-                <div className="relative z-20 text-white">
-                  <span className="text-xs uppercase tracking-wider font-semibold text-brand-400">
+                {cat.image ? (
+                  <Image
+                    src={cat.image}
+                    alt={cat.name}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10" />
+                <div className="relative z-20 text-white p-6">
+                  <span className="text-[11px] uppercase tracking-wider font-semibold text-brand-300">
                     {cat.productCount} {cat.productCount === 1 ? 'Product' : 'Products'}
                   </span>
-                  <h3 className="text-xl font-bold mt-1 group-hover:text-brand-300 transition-colors">
+                  <h3 className="text-xl font-bold mt-1 text-white group-hover:text-brand-200 transition-colors">
                     {cat.name}
                   </h3>
-                  <p className="text-xs text-gray-300 mt-1 line-clamp-2">
-                    {cat.description}
-                  </p>
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-400 mt-3 group-hover:translate-x-1 transition-transform">
+                  {cat.description && (
+                    <p className="text-xs text-gray-200 mt-1 line-clamp-2 leading-relaxed">
+                      {cat.description}
+                    </p>
+                  )}
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-300 mt-3 group-hover:translate-x-1 transition-transform">
                     Explore &rarr;
                   </span>
                 </div>

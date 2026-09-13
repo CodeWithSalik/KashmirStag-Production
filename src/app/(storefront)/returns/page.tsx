@@ -13,7 +13,7 @@ export default function ReturnsPage() {
       
       <div className="prose prose-lg max-w-none text-text-secondary">
         <p className="lead text-xl mb-8">
-          We want you to love what you ordered from {APP_NAME}. If something is not right, let us know and we'll do our best to fix it.
+          We want you to love what you ordered from {APP_NAME}. If something is not right, let us know and we&apos;ll do our best to fix it.
         </p>
 
         <section className="mt-8 bg-brand-50 p-6 rounded-xl border border-brand-100">
@@ -40,10 +40,10 @@ export default function ReturnsPage() {
           <h2 className="text-2xl font-bold text-text mb-4">How to Initiate a Return</h2>
           <ol className="list-decimal pl-6 space-y-4 mt-4">
             <li>
-              <strong>Log into your account:</strong> Go to the 'Orders' section in your dashboard.
+              <strong>Log into your account:</strong> Go to the &apos;Orders&apos; section in your dashboard.
             </li>
             <li>
-              <strong>Select the order:</strong> Find the order containing the item you wish to return and click 'Return/Exchange'.
+              <strong>Select the order:</strong> Find the order containing the item you wish to return and click &apos;Return/Exchange&apos;.
             </li>
             <li>
               <strong>Provide details:</strong> Select the reason for return. If you received a defective or incorrect item, please attach photos.
@@ -53,7 +53,7 @@ export default function ReturnsPage() {
             </li>
           </ol>
           <p className="mt-4">
-            If you checked out as a guest, please email us at <strong>pirzadasalik116@gmail.com</strong> with your order number and request.
+            If you checked out as a guest, please email us at <strong>support@kashmirstag.com</strong> with your order number and request.
           </p>
         </section>
 

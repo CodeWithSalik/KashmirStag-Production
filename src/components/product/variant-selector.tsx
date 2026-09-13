@@ -54,9 +54,11 @@ export function VariantSelector({
   return (
     <div className="flex flex-col gap-6">
       {colors.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <span className="text-sm font-medium text-text-primary">Color: {selectedColor}</span>
-          <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-text">Color: <span className="font-normal text-text-secondary">{selectedColor}</span></span>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
             {colors.map((c) => {
               const isSelected = selectedColor === c.color;
               return (
@@ -66,8 +68,10 @@ export function VariantSelector({
                   aria-label={`Select color ${c.color}`}
                   title={c.color}
                   className={cn(
-                    "h-8 w-8 rounded-full border-2 transition-all",
-                    isSelected ? "border-brand-600 ring-2 ring-brand-600 ring-offset-2" : "border-surface-200 hover:border-surface-300"
+                    "h-8 w-8 rounded-full border transition-all relative flex items-center justify-center",
+                    isSelected
+                      ? "border-brand-700 ring-2 ring-brand-700 ring-offset-2 scale-105"
+                      : "border-border hover:border-text-secondary hover:scale-105"
                   )}
                   style={{ backgroundColor: c.colorHex || '#ccc' }}
                 />
@@ -78,9 +82,11 @@ export function VariantSelector({
       )}
 
       {sizes.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <span className="text-sm font-medium text-text-primary">Size: {selectedSize}</span>
-          <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-text">Size: <span className="font-normal text-text-secondary">{selectedSize}</span></span>
+          </div>
+          <div className="flex flex-wrap gap-2">
             {sizes.map((s) => {
               const isSelected = selectedSize === s;
               const isAvailable = variants.some(v => v.size === s && v.color === selectedColor && (v.availableQty ?? 0) > 0);
@@ -92,12 +98,12 @@ export function VariantSelector({
                   disabled={!isAvailable}
                   aria-label={`Select size ${s}`}
                   className={cn(
-                    "min-w-[3rem] px-3 py-2 text-sm rounded-md border transition-colors",
+                    "min-w-[3rem] px-3.5 py-2 text-xs font-medium rounded-lg border transition-all duration-150",
                     isSelected
-                      ? "border-brand-600 bg-brand-50 text-brand-700 font-medium"
+                      ? "border-brand-700 bg-brand-50/70 text-brand-800 font-semibold shadow-sm ring-1 ring-brand-700"
                       : isAvailable
-                      ? "border-surface-200 bg-surface-50 hover:border-brand-300 text-text-secondary"
-                      : "border-surface-100 bg-surface-100 text-text-muted cursor-not-allowed opacity-50"
+                      ? "border-border bg-surface hover:border-brand-600 hover:text-brand-700 text-text active:scale-95"
+                      : "border-border/60 bg-surface-secondary text-text-tertiary cursor-not-allowed line-through opacity-50"
                   )}
                 >
                   {s}
@@ -109,8 +115,13 @@ export function VariantSelector({
       )}
 
       {status && (
-        <div className={cn("text-sm font-medium", status.color)}>
-          {status.text}
+        <div className="flex items-center gap-2 text-xs font-medium pt-1">
+          <span className={cn(
+            "w-2 h-2 rounded-full shrink-0",
+            (selectedVariant?.availableQty ?? 0) > 5 ? "bg-success" :
+            (selectedVariant?.availableQty ?? 0) > 0 ? "bg-warning" : "bg-text-tertiary"
+          )} />
+          <span className={status.color}>{status.text}</span>
         </div>
       )}
     </div>

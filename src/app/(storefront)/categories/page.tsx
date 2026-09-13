@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { connectDB } from '@/lib/db';
 import Category from '@/models/Category';
 import Product from '@/models/Product';
@@ -58,7 +59,18 @@ export default async function CategoriesPage() {
               href={`/category/${cat.slug}`}
               className="group relative flex flex-col justify-end h-72 overflow-hidden rounded-xl bg-surface-tertiary p-6 border border-border transition-all duration-300 hover:shadow-elevated hover:border-brand-500"
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
+              {cat.image ? (
+                <Image
+                  src={cat.image}
+                  alt={cat.name}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-brand-950/80 via-brand-900/40 to-surface-tertiary" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10" />
               <div className="relative z-20 text-white">
                 <span className="text-xs uppercase tracking-wider font-semibold text-brand-400">
                   {cat.productCount} {cat.productCount === 1 ? 'Product' : 'Products'}

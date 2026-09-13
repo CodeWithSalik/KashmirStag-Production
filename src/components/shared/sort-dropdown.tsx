@@ -23,7 +23,7 @@ export function SortDropdown() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-text-muted whitespace-nowrap">Sort by:</span>
+      <span className="text-xs font-medium text-text-secondary whitespace-nowrap">Sort by:</span>
       <Select
         value={currentSort}
         onChange={(e) => handleSortChange(e.target.value)}

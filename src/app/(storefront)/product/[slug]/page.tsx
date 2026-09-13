@@ -11,6 +11,7 @@ import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Price } from "@/components/ui/price";
 import { StarRating } from "@/components/ui/star-rating";
 import { AddToCartButton } from "./add-to-cart-button";
+import { Truck, RotateCcw, ShieldCheck } from "lucide-react";
 
 import { generateProductSeo } from "@/config/seo";
 
@@ -139,9 +140,19 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
           <AddToCartButton product={product} variants={variants} />
 
-          <div className="border-t border-border pt-6 mt-6 text-sm text-text-secondary space-y-2">
-            <p><strong>Shipping:</strong> Free shipping on orders over ₹999.</p>
-            <p><strong>Returns:</strong> 7-day easy return policy.</p>
+          <div className="border-t border-border pt-6 mt-6 space-y-3 bg-surface-secondary/50 p-4 rounded-xl border border-border">
+            <div className="flex items-center gap-3 text-xs text-text-secondary">
+              <Truck className="w-4 h-4 text-brand-700 shrink-0" />
+              <span><strong className="text-text">Free Express Shipping</strong> on all orders above ₹999</span>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-text-secondary">
+              <RotateCcw className="w-4 h-4 text-brand-700 shrink-0" />
+              <span><strong className="text-text">7-Day Easy Returns</strong> — full refund or exchange</span>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-text-secondary">
+              <ShieldCheck className="w-4 h-4 text-brand-700 shrink-0" />
+              <span><strong className="text-text">Authentic Guarantee</strong> — master-crafted Kashmiri quality</span>
+            </div>
           </div>
         </div>
       </div>

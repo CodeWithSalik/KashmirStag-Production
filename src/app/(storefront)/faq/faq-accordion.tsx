@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { HiOutlineChevronDown } from 'react-icons/hi2';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FAQItemProps {
@@ -13,25 +13,26 @@ export function FAQAccordion({ faqs }: { faqs: FAQItemProps[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3.5">
       {faqs.map((faq, index) => {
         const isOpen = openIndex === index;
         return (
           <div 
             key={index} 
-            className="border border-border rounded-lg bg-white overflow-hidden transition-all duration-200"
+            className="border border-border rounded-xl bg-surface overflow-hidden transition-all duration-200 shadow-xs"
           >
             <button
-              className="flex items-center justify-between w-full p-5 text-left bg-white hover:bg-surface-secondary transition-colors focus:outline-none"
+              className="flex items-center justify-between w-full p-5 text-left bg-surface hover:bg-surface-secondary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
               onClick={() => setOpenIndex(isOpen ? null : index)}
               aria-expanded={isOpen}
             >
               <span className="font-semibold text-text pr-8">{faq.question}</span>
-              <HiOutlineChevronDown 
+              <ChevronDown 
                 className={cn(
-                  "w-5 h-5 text-text-secondary shrink-0 transition-transform duration-200",
-                  isOpen && "transform rotate-180"
+                  "w-4 h-4 text-text-secondary shrink-0 transition-transform duration-200",
+                  isOpen && "transform rotate-180 text-brand-700"
                 )} 
+                strokeWidth={2}
               />
             </button>
             <div 
@@ -40,7 +41,7 @@ export function FAQAccordion({ faqs }: { faqs: FAQItemProps[] }) {
                 isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
               )}
             >
-              <div className="p-5 pt-0 text-text-secondary border-t border-border mt-2">
+              <div className="p-5 pt-0 text-text-secondary text-sm border-t border-border mt-2 leading-relaxed">
                 {faq.answer}
               </div>
             </div>

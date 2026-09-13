@@ -48,14 +48,67 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[
   confirmed: ['processing', 'cancelled'],
   processing: ['packed', 'cancelled'],
   packed: ['shipped', 'cancelled'],
-  shipped: ['out_for_delivery', 'delivered', 'cancelled'],
-  out_for_delivery: ['delivered'],
+  shipped: ['out_for_delivery', 'delivered'],
+  out_for_delivery: ['delivered', 'shipped'],
   delivered: ['return_requested'],
   cancelled: ['refunded'],
   return_requested: ['returned', 'delivered'],
   returned: ['refunded'],
   refunded: [],
 };
+
+/** Statuses from which an order may be directly cancelled */
+export const CANCELLABLE_ORDER_STATUSES: readonly OrderStatus[] = [
+  'pending',
+  'confirmed',
+  'processing',
+  'packed',
+] as const;
+
+export function isCancellableStatus(status: OrderStatus): boolean {
+  return CANCELLABLE_ORDER_STATUSES.includes(status);
+}
+
+/**
+ * Returns allowed next statuses from current status, optionally filtered by payment state.
+ */
+export function getAvailableTransitions(
+  currentStatus: OrderStatus,
+  paymentStatus?: PaymentStatus
+): OrderStatus[] {
+  const transitions = [...(ORDER_STATUS_TRANSITIONS[currentStatus] || [])];
+
+  // If order is cancelled, it can only transition to 'refunded' if payment was actually collected
+  if (currentStatus === 'cancelled') {
+    if (paymentStatus === 'paid' || paymentStatus === 'partially_refunded') {
+      return ['refunded'];
+    }
+    return [];
+  }
+
+  // If order was returned, it can only transition to 'refunded' if payment was collected
+  if (currentStatus === 'returned') {
+    if (paymentStatus === 'paid' || paymentStatus === 'partially_refunded') {
+      return ['refunded'];
+    }
+    return [];
+  }
+
+  return transitions;
+}
+
+/**
+ * Validates whether transitioning from -> to is legal in the state machine.
+ */
+export function isValidTransition(
+  from: OrderStatus,
+  to: OrderStatus,
+  paymentStatus?: PaymentStatus
+): boolean {
+  const allowed = getAvailableTransitions(from, paymentStatus);
+  return allowed.includes(to);
+}
+
 
 export const PAYMENT_STATUSES = [
   'unpaid',

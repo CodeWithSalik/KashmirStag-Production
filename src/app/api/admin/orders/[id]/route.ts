@@ -26,7 +26,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const admin = requireAdmin(request);
     const data = await parseBody(request, updateOrderStatusSchema);
     
-    const order = await updateOrderStatus(id, data.status, admin.sub, data.comment);
+    const order = await updateOrderStatus(id, data.status, admin.sub, data.comment, data.expectedCurrentStatus);
     return successResponse(order);
   } catch (error) {
     return handleApiError(error);

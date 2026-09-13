@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ModalProps {
@@ -73,12 +74,10 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
           </h2>
           <button
             onClick={onClose}
-            className="text-text-secondary hover:text-text transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
-            aria-label="Close"
+            className="p-1 text-text-secondary hover:text-text hover:bg-surface-secondary transition-colors rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700"
+            aria-label="Close modal dialog"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" strokeWidth={1.75} />
           </button>
         </div>
         <div className="px-6 py-4 overflow-y-auto">
