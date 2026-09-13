@@ -39,6 +39,9 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.ico',
   },
+  other: {
+    'google-adsense-account': 'ca-pub-3631011011308556',
+  },
 };
 
 const organizationAndWebsiteJsonLd = {
@@ -90,6 +93,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3631011011308556"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className={`${inter.className} min-h-screen flex flex-col bg-surface text-text font-sans`} suppressHydrationWarning>
         <script
           type="application/ld+json"
